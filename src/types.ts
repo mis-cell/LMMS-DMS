@@ -67,6 +67,7 @@ export interface LegalDocument {
   riskLevel: "Low" | "Medium" | "High" | null; // Extracted via AI
   parties: string[]; // Extracted via AI
   expiryDate: string | null; // For contracts
+  textContent?: string; // Optional full transcript or legal text content
 }
 
 export type NoticeType = "Incoming" | "Outgoing";

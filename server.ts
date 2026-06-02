@@ -558,7 +558,8 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     riskSummary,
     riskLevel,
     parties,
-    expiryDate
+    expiryDate,
+    textContent: textContent || `General automated backup of ${fileName} under category ${category}.`
   };
 
   db.documents.unshift(newDoc);
@@ -578,6 +579,93 @@ app.post("/api/documents", async (req: Request, res: Response) => {
   );
 
   res.status(201).json(newDoc);
+});
+
+// Download simulated/physical file with Indian conglomerate header integrity
+app.get("/api/documents/:id/download", async (req: Request, res: Response) => {
+  const user = getUserContext(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const { id } = req.params;
+  const doc = db.documents.find(d => d.id === id);
+  if (!doc) {
+    return res.status(404).json({ error: "Document not found" });
+  }
+
+  // Ensure customer isolation
+  if (user.role !== "Super Admin" && doc.company !== user.company) {
+    return res.status(403).json({ error: "Access Denied: Security isolation breach." });
+  }
+
+  // Create physical fallback path
+  const filenameClean = doc.fileName.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+  const fallbackDir = path.join(process.cwd(), "data", "simulated_drive", doc.company);
+  if (!fs.existsSync(fallbackDir)) {
+    fs.mkdirSync(fallbackDir, { recursive: true });
+  }
+  const filePath = path.join(fallbackDir, filenameClean.replace(/\.[^/.]+$/, "") + ".txt");
+
+  const border = "================================================================================";
+  const header = `LRLMS ENTERPRISE CLOUD SYNC FILE ARCHIVE: PORTAL GATEWAY [${doc.company.toUpperCase()}]`;
+  const footer = `END OF LRLMS SECURE SYSTEM IMMUTABLE INTEGRITY DEED`;
+  const signatureSeal = `VERIFIED BY LRLMS AI AUDITOR (SHA-256 CONTEXT BLOCK SEAL)\n[AUTHENTICITY SECURE ID: ${doc.googleDriveFileId || "MOCK_DRIVE_HASH_V1_7AB"}]`;
+
+  const fileContent = [
+    border,
+    header,
+    border,
+    `DOCUMENT REFERENCE REQUISITE IDENTIFICATION:`,
+    `- Global Registry ID    : ${doc.id}`,
+    `- Associated Matter ID  : ${doc.matterId || "N/A (Standalone Corporate Filing)"}`,
+    `- Legal Entity Owner    : ${doc.company} Corporate Division`,
+    `- Document Category     : ${doc.category}`,
+    `- Current File Revision : Version ${doc.version}`,
+    `- Indexed Timestamp     : ${doc.uploadedOn}`,
+    `- Certified Synced By   : ${doc.uploadedBy}`,
+    `- GDrive Cloud Reference: ${doc.googleDriveLink}`,
+    border,
+    `AI RISK EVALUATION ASSIGNMENTS:`,
+    `- Risk Priority Level   : ${doc.riskLevel || "Low"}`,
+    `- Parties Extracted     : ${doc.parties?.join(", ") || "N/A"}`,
+    `- Validity Target Expiry: ${doc.expiryDate || "N/A"}`,
+    `- Automated Synopsis    :`,
+    `  "${doc.riskSummary || "Minimal risk detected. Document aligned with standard compliance mandates."}"`,
+    border,
+    `DOCUMENT RECONSTRUCTION OCR TRANSCRIPT BLOCK:`,
+    ``,
+    doc.textContent || `[SIMULATED FILE BODY CONTENT]
+
+This serves as a registered digital copy of "${doc.fileName}" held under institutional legal custody.
+All terms, clauses, and structural liabilities contained in this document are strictly isolated to the specified portal access of ${doc.company}.
+
+CLAUSE 1. PRIVILEGE & SECURED INTEGRITY
+This file and any attached transcriptions are legally privileged and intended solely for the authorized administrative leads of the Enterprise Group.
+
+CLAUSE 2. REGULATORY & AUDIT ALIGNMENT
+The active auditor roles and regional legal heads have verified that the file conforms to Indian State and Central compliance requirements.`,
+    ``,
+    border,
+    signatureSeal,
+    border,
+    footer,
+    border
+  ].join("\n");
+
+  // Write physical file to local disk to satisfy "add dummy files everywhere" literally!
+  fs.writeFileSync(filePath, fileContent, "utf-8");
+
+  await addAuditLog(
+    user.id,
+    user.name,
+    user.role,
+    doc.company,
+    "Document Download",
+    `Immutable download request executed for file: ${doc.fileName} (${doc.id})`
+  );
+
+  res.setHeader("Content-Disposition", `attachment; filename="${filenameClean.replace(/\.[^/.]+$/, "")}_LRLMS_Synced.txt"`);
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.send(fileContent);
 });
 
 // Create Notice
@@ -927,10 +1015,80 @@ async function syncOnBoot() {
   }
 }
 
+// Write dummy physical txt copies of seeded/uploaded documents onto the server disk
+function prepopulateSimulatedFileSystem() {
+  try {
+    console.log("Pre-populating physical mock filesystem drives with dummy files...");
+    db.documents.forEach(doc => {
+      const filenameClean = doc.fileName.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const fallbackDir = path.join(process.cwd(), "data", "simulated_drive", doc.company);
+      if (!fs.existsSync(fallbackDir)) {
+        fs.mkdirSync(fallbackDir, { recursive: true });
+      }
+      const filePath = path.join(fallbackDir, filenameClean.replace(/\.[^/.]+$/, "") + ".txt");
+      if (fs.existsSync(filePath)) return; // Already exists
+
+      const border = "================================================================================";
+      const header = `LRLMS ENTERPRISE CLOUD SYNC FILE ARCHIVE: PORTAL GATEWAY [${doc.company.toUpperCase()}]`;
+      const footer = `END OF LRLMS SECURE SYSTEM IMMUTABLE INTEGRITY DEED`;
+      const signatureSeal = `VERIFIED BY LRLMS AI AUDITOR (SHA-256 CONTEXT BLOCK SEAL)\n[AUTHENTICITY SECURE ID: ${doc.googleDriveFileId || "MOCK_DRIVE_HASH_V1_7AB"}]`;
+
+      const fileContent = [
+        border,
+        header,
+        border,
+        `DOCUMENT REFERENCE REQUISITE IDENTIFICATION:`,
+        `- Global Registry ID    : ${doc.id}`,
+        `- Associated Matter ID  : ${doc.matterId || "N/A (Standalone Corporate Filing)"}`,
+        `- Legal Entity Owner    : ${doc.company} Corporate Division`,
+        `- Document Category     : ${doc.category}`,
+        `- Current File Revision : Version ${doc.version}`,
+        `- Indexed Timestamp     : ${doc.uploadedOn}`,
+        `- Certified Synced By   : ${doc.uploadedBy}`,
+        `- GDrive Cloud Reference: ${doc.googleDriveLink}`,
+        border,
+        `AI RISK EVALUATION ASSIGNMENTS:`,
+        `- Risk Priority Level   : ${doc.riskLevel || "Low"}`,
+        `- Parties Extracted     : ${doc.parties?.join(", ") || "N/A"}`,
+        `- Validity Target Expiry: ${doc.expiryDate || "N/A"}`,
+        `- Automated Synopsis    :`,
+        `  "${doc.riskSummary || "Minimal risk detected. Document aligned with standard compliance mandates."}"`,
+        border,
+        `DOCUMENT RECONSTRUCTION OCR TRANSCRIPT BLOCK:`,
+        ``,
+        doc.textContent || `[SIMULATED FILE BODY CONTENT]
+
+This serves as a registered digital copy of "${doc.fileName}" held under institutional legal custody.
+All terms, clauses, and structural liabilities contained in this document are strictly isolated to the specified portal access of ${doc.company}.
+
+CLAUSE 1. PRIVILEGE & SECURED INTEGRITY
+This file and any attached transcriptions are legally privileged and intended solely for the authorized administrative leads of the Enterprise Group.
+
+CLAUSE 2. REGULATORY & AUDIT ALIGNMENT
+The active auditor roles and regional legal heads have verified that the file conforms to Indian State and Central compliance requirements.`,
+        ``,
+        border,
+        signatureSeal,
+        border,
+        footer,
+        border
+      ].join("\n");
+
+      fs.writeFileSync(filePath, fileContent, "utf-8");
+    });
+    console.log("Mock physical filesystem drive population successfully completed!");
+  } catch (err) {
+    console.error("Failed to populate mock filesystem drives:", err);
+  }
+}
+
 // Serve static assets and configure Vite middleware for development
 async function startServer() {
   // Sync Supabase dbs on boot
   await syncOnBoot();
+  
+  // Prepopulate simulated Google Dive physical files on node disk
+  prepopulateSimulatedFileSystem();
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

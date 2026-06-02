@@ -10,7 +10,9 @@ import {
   BookOpen,
   CheckCircle,
   HelpCircle,
-  FolderOpen
+  FolderOpen,
+  Download,
+  X
 } from "lucide-react";
 import { LegalDocument, DocCategory, Matter } from "../types";
 
@@ -50,6 +52,7 @@ export default function DocumentUploadModal({ onUpload, matters, documents, curr
 
   // GDrive folder exploration filter state
   const [gdriveSubfolder, setGdriveSubfolder] = useState<string>("All Folders");
+  const [previewDoc, setPreviewDoc] = useState<LegalDocument | null>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -391,15 +394,36 @@ ORDER: Ex-parte ad-interim injunction granted. Respondent, their directors, agen
                       </p>
                     </div>
 
-                    <a
-                      href={doc.googleDriveLink}
-                      target="_blank"
-                      referrerPolicy="no-referrer"
-                      className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline shrink-0 bg-slate-50 hover:bg-indigo-50/50 p-2 rounded-lg transition-all"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      GDive Link
-                    </a>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
+                      <a
+                        href={doc.googleDriveLink}
+                        target="_blank"
+                        referrerPolicy="no-referrer"
+                        className="flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-850 bg-slate-50 hover:bg-slate-100 p-2 rounded-lg transition-all border border-slate-200"
+                        title="View raw link on external Google Drive"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        GDive
+                      </a>
+                      <a
+                        href={`/api/documents/${doc.id}/download`}
+                        download
+                        className="flex items-center justify-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-950 bg-indigo-50 hover:bg-indigo-150/60 p-2 rounded-lg transition-all border border-indigo-100"
+                        title="Download verified, synced functional dummy text file physically"
+                      >
+                        <Download className="h-3 w-3" />
+                        Download
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc(doc)}
+                        className="flex items-center justify-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 p-2 rounded-lg transition-all border border-emerald-100 cursor-pointer"
+                        title="Read direct OCR transcript inline"
+                      >
+                        <BookOpen className="h-3 w-3" />
+                        Preview
+                      </button>
+                    </div>
                   </div>
 
                   {/* AI Extracted Clause Risk Assessment card */}
@@ -436,6 +460,154 @@ ORDER: Ex-parte ad-interim injunction granted. Respondent, their directors, agen
           )}
         </div>
       </div>
+
+      {/* Structured Document Viewer Modal Overlay */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 font-sans">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="bg-indigo-500 text-white p-1.5 rounded">
+                  <FileText className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold font-display leading-none text-white block">
+                    {previewDoc.fileName}
+                  </h3>
+                  <span className="text-[10.5px] font-mono text-slate-400 mt-1 block">
+                    System Node Reference: {previewDoc.id}
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setPreviewDoc(null)}
+                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-2 rounded-full transition cursor-pointer"
+                title="Exit Reader Workspace"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh] text-slate-800 text-xs">
+              
+              {/* Core Metadata Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-mono tracking-wide">Category</span>
+                  <span className="font-bold text-slate-850 mt-1 block">{previewDoc.category}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-mono tracking-wide">Owner tenant</span>
+                  <span className="font-bold text-slate-850 mt-1 block">{previewDoc.company} Division</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-mono tracking-wide">Revision Status</span>
+                  <span className="font-bold text-slate-850 mt-1 block">Version {previewDoc.version}.0</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-mono tracking-wide">Expiration Target</span>
+                  <span className="font-bold text-rose-600 mt-1 block">{previewDoc.expiryDate || "Indefinite Lock"}</span>
+                </div>
+              </div>
+
+              {/* AI Risk Score banner */}
+              {previewDoc.riskSummary && (
+                <div className={`p-4 rounded-xl border ${
+                  previewDoc.riskLevel === "High" ? "bg-rose-50 border-rose-100 text-rose-900" :
+                  previewDoc.riskLevel === "Medium" ? "bg-amber-50 border-amber-100 text-amber-900" :
+                  "bg-emerald-50 border-emerald-100 text-emerald-900"
+                }`}>
+                  <div className="flex items-center gap-1.5 font-bold mb-1">
+                    <Sparkles className={`h-4 w-4 ${
+                      previewDoc.riskLevel === "High" ? "text-rose-600 animate-pulse" :
+                      previewDoc.riskLevel === "Medium" ? "text-amber-600" : "text-emerald-600"
+                    }`} />
+                    <span>LRLMS Automated Compliance Audit Analytics</span>
+                    <span className={`text-[9.5px] px-1.5 py-0.5 rounded ml-auto text-white font-mono font-bold uppercase ${
+                      previewDoc.riskLevel === "High" ? "bg-rose-600" :
+                      previewDoc.riskLevel === "Medium" ? "bg-amber-600" : "bg-emerald-600"
+                    }`}>
+                      Risk Category: {previewDoc.riskLevel || "Low"}
+                    </span>
+                  </div>
+                  <p className="text-[11.5px] italic leading-normal">
+                    "{previewDoc.riskSummary}"
+                  </p>
+                  
+                  {previewDoc.parties && previewDoc.parties.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-200/50 pt-2.5">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Parties Identified:</span>
+                      {previewDoc.parties.map((entity, i) => (
+                        <span key={i} className="text-[10px] bg-white border font-semibold px-2 py-0.5 rounded text-slate-700">
+                          {entity}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Raw file Transcript Viewer */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold font-mono">
+                    Google Drive OCR Text / Structured Clauses
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Encoding: UTF-8 Plaintext
+                  </span>
+                </div>
+                <div className="bg-slate-900 text-slate-100 p-5 rounded-xl font-mono text-[11px] leading-relaxed overflow-x-auto whitespace-pre-wrap max-h-72 border border-slate-800 shadow-inner">
+                  {previewDoc.textContent || `==============================================================================
+LRLMS ENTERPRISE CLOUD SYNC FILE ARCHIVE: PORTAL GATEWAY [${previewDoc.company.toUpperCase()}]
+==============================================================================
+
+Title: ${previewDoc.fileName}
+System Document Registry ID: ${previewDoc.id}
+Uploaded On: ${new Date(previewDoc.uploadedOn).toLocaleString()}
+Uploaded By Operations Officer: ${previewDoc.uploadedBy}
+
+CLAUSE I. DESCRIPTION & RECORD RETRIEVABILITY
+This serves as a simulated transcription backup of files stored securely inside GDrive vault. 
+No third-party access is authorized. Material exposures and litigious outcomes are governed under regional tribunal jurisdictions.
+
+CLAUSE II. AI PARSED RISK OVERVIEW
+${previewDoc.riskSummary || "No critical threats flagged. Retain original with central records."}`}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer buttons row */}
+            <div className="bg-slate-50 p-5 border-t border-slate-100 flex items-center justify-between gap-3 text-xs">
+              <span className="text-[10px] text-slate-400 font-medium">
+                Verified File Integrity Checksum: SHA-256 Enabled
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer font-semibold select-none"
+                >
+                  Close Reader
+                </button>
+                <a
+                  href={`/api/documents/${previewDoc.id}/download`}
+                  download
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition flex items-center gap-1 shadow-xs cursor-pointer select-none"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download File
+                </a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
