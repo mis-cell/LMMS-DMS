@@ -42,6 +42,24 @@ import MetricCards from "./components/MetricCards";
 import MatterCard from "./components/MatterCard";
 import DocumentUploadModal from "./components/DocumentUploadModal";
 import LegalAssistantChat from "./components/LegalAssistantChat";
+import { handleClientSideFallback } from "./lib/client_api";
+
+// Resilient API Request Wrapper for fallback direct Supabase client sync
+async function apiRequest(url: string, options: any = {}): Promise<Response> {
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 404 && url.startsWith("/api/")) {
+      return await handleClientSideFallback(url, options);
+    }
+    return res;
+  } catch (err) {
+    if (url.startsWith("/api/")) {
+      console.warn("Backend server not responding. Falling back to secure serverless client-side engine.", err);
+      return await handleClientSideFallback(url, options);
+    }
+    throw err;
+  }
+}
 
 export default function App() {
   // Database States
@@ -105,7 +123,7 @@ export default function App() {
 
   async function fetchSysStatus() {
     try {
-      const res = await fetch("/api/sys-status");
+      const res = await apiRequest("/api/sys-status");
       const data = await res.json();
       setSysStatus(data);
     } catch (err) {
@@ -118,7 +136,7 @@ export default function App() {
     setIsSeeding(true);
     setSeedSuccessMsg("");
     try {
-      const res = await fetch("/api/sys-status/seed", { method: "POST" });
+      const res = await apiRequest("/api/sys-status/seed", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
         setSeedSuccessMsg(data.message);
@@ -138,7 +156,7 @@ export default function App() {
   useEffect(() => {
     async function loadInit() {
       try {
-        const res = await fetch("/api/init");
+        const res = await apiRequest("/api/init");
         const data = await res.json();
         setUsers(data.users);
         
@@ -160,7 +178,7 @@ export default function App() {
     
     async function fetchIsolatedData() {
       try {
-        const res = await fetch("/api/data", {
+        const res = await apiRequest("/api/data", {
           headers: {
             "x-user-id": activeUser.id
           }
@@ -182,7 +200,7 @@ export default function App() {
   const triggerManualRefresh = async () => {
     if (!activeUser) return;
     try {
-      const res = await fetch("/api/data", {
+      const res = await apiRequest("/api/data", {
         headers: {
           "x-user-id": activeUser.id
         }
@@ -204,7 +222,7 @@ export default function App() {
     if (!newTitle.trim()) return;
 
     try {
-      const res = await fetch("/api/matters", {
+      const res = await apiRequest("/api/matters", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -243,8 +261,8 @@ export default function App() {
   // Stage Transition Handler (from interactive component checks)
   const handleUpdateMatterStage = async (id: string, nextStatus: MatterStatus) => {
     try {
-      const res = await fetch(`/api/matters/${id}`, {
-        method: "PUT",
+      const res = await apiRequest(`/api/matters/${id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "x-user-id": activeUser?.id || ""
@@ -263,7 +281,7 @@ export default function App() {
   // Schedule court hearing on matter
   const handleScheduleHearing = async (matterId: string, hearingDate: string, court: string, remarks: string) => {
     try {
-      const res = await fetch("/api/hearings", {
+      const res = await apiRequest("/api/hearings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -288,7 +306,7 @@ export default function App() {
     textContent: string;
   }) => {
     try {
-      const res = await fetch("/api/documents", {
+      const res = await apiRequest("/api/documents", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -318,7 +336,7 @@ export default function App() {
     if (!noticeSender.trim()) return;
 
     try {
-      const res = await fetch("/api/notices", {
+      const res = await apiRequest("/api/notices", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -356,8 +374,8 @@ export default function App() {
     else nextStatus = "Pending Action";
 
     try {
-      const res = await fetch(`/api/notices/${id}`, {
-        method: "PUT",
+      const res = await apiRequest(`/api/notices/${id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "x-user-id": activeUser?.id || ""
@@ -394,7 +412,7 @@ export default function App() {
         status: usrStatus
       };
 
-      const res = await fetch(url, {
+      const res = await apiRequest(url, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -405,7 +423,7 @@ export default function App() {
 
       if (res.ok) {
         // Refresh users list
-        const initRes = await fetch("/api/init");
+        const initRes = await apiRequest("/api/init");
         if (initRes.ok) {
           const initData = await initRes.json();
           setUsers(initData.users);
@@ -447,7 +465,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`/api/users/${userId}`, {
+      const res = await apiRequest(`/api/users/${userId}`, {
         method: "DELETE",
         headers: {
           "x-user-id": activeUser?.id || ""
@@ -455,7 +473,7 @@ export default function App() {
       });
 
       if (res.ok) {
-        const initRes = await fetch("/api/init");
+        const initRes = await apiRequest("/api/init");
         if (initRes.ok) {
           const initData = await initRes.json();
           setUsers(initData.users);
