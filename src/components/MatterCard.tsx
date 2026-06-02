@@ -13,6 +13,7 @@ import {
   IndianRupee,
   Activity
 } from "lucide-react";
+import { motion } from "motion/react";
 import { Matter, LegalDocument, MatterStatus, Hearing } from "../types";
 
 interface MatterCardProps {
@@ -171,8 +172,18 @@ export default function MatterCard({
               onClick={() => onUpdateStatus(matter.id, stg)}
               className="flex flex-col items-center flex-1 min-w-[70px] text-center focus:outline-none group cursor-pointer"
             >
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all duration-200 ${getStageColor(
+              <motion.div
+                layout
+                animate={{
+                  scale: matter.status === stg ? 1.15 : 1,
+                  rotate: STAGES.indexOf(matter.status) > index ? 360 : 0
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 18
+                }}
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors duration-300 ${getStageColor(
                   stg,
                   matter.status
                 )}`}
@@ -182,7 +193,7 @@ export default function MatterCard({
                 ) : (
                   <span>{index + 1}</span>
                 )}
-              </div>
+              </motion.div>
               <span
                 className={`text-[10px] mt-1.5 font-medium tracking-tight whitespace-nowrap ${
                   matter.status === stg

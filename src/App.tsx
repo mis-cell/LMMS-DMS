@@ -21,7 +21,9 @@ import {
   X,
   ExternalLink,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Download,
+  DollarSign
 } from "lucide-react";
 import { 
   User, 
@@ -56,6 +58,7 @@ export default function App() {
   const [matterSearch, setMatterSearch] = useState("");
   const [matterStatusFilter, setMatterStatusFilter] = useState<string>("All Statuses");
   const [matterTypeFilter, setMatterTypeFilter] = useState<string>("All Types");
+  const [matterHighlightFilter, setMatterHighlightFilter] = useState<string>("All Matters");
 
   // User Administration states
   const [showUserModal, setShowUserModal] = useState(false);
@@ -474,7 +477,56 @@ export default function App() {
     setSelectedTab("documents");
   };
 
-  // Search filtered matters matching user parameters
+  // Frontend utility: checks if a trial schedule date is within 7 days of the reference date 2026-06-02
+  const isWithin7Days = (hearingDateStr: string): boolean => {
+    if (!hearingDateStr) return false;
+    try {
+      const today = new Date("2026-06-02");
+      const targetDate = new Date(hearingDateStr);
+      const timeDiff = targetDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      // Returns true if date is within next 7 days (including today)
+      return diffDays >= 0 && diffDays <= 7;
+    } catch {
+      return false;
+    }
+  };
+
+  // Download Audit logs stream as a formatted CSV file
+  const handleDownloadAuditLogsCSV = () => {
+    if (!["Auditor", "Super Admin"].includes(activeUser?.role || "")) {
+      alert("Access Denied: Only Auditor or Super Admin accounts can download secure logs.");
+      return;
+    }
+
+    const headers = ["ID", "User ID", "User Name", "User Role", "Portal Clearance", "Action Category", "Filing Timestamp", "Audit Particulars"];
+    const rows = auditLogs.map(log => [
+      log.id,
+      log.userId,
+      log.userName,
+      log.userRole,
+      log.company,
+      log.action,
+      log.timestamp,
+      `"${log.details.replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `LRLMS_Immutable_Audits_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Search filtered matters matching user parameters and highlight directives
   const filteredMatters = matters.filter((m) => {
     const matchesSearch = 
       m.id.toLowerCase().includes(matterSearch.toLowerCase()) ||
@@ -487,7 +539,16 @@ export default function App() {
     const matchesStatus = matterStatusFilter === "All Statuses" || m.status === matterStatusFilter;
     const matchesType = matterTypeFilter === "All Types" || m.type === matterTypeFilter;
 
-    return matchesSearch && matchesStatus && matchesType;
+    let matchesHighlight = true;
+    if (matterHighlightFilter === "Approaching Hearing") {
+      // Approaching Hearing check: has aNextHearingDate set or any upcoming hearing under 7/8 days
+      matchesHighlight = !!m.nextHearingDate;
+    } else if (matterHighlightFilter === "High Value Exposure") {
+      // High value exposure check: value filter >= 2.5 Million (25 Lakhs)
+      matchesHighlight = m.value >= 2500000;
+    }
+
+    return matchesSearch && matchesStatus && matchesType && matchesHighlight;
   });
 
   // Calculate sum counts for pie visualization inside dashboard
@@ -819,33 +880,59 @@ export default function App() {
                   ) : (
                     hearings
                       .filter(h => h.status === "Scheduled")
-                      .map((hrg) => (
-                        <div key={hrg.id} className="py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 first:pt-0 last:pb-0">
-                          <div className="flex items-start gap-3">
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 border border-indigo-100 flex flex-col items-center justify-center text-indigo-700">
-                              <span className="text-[9px] font-bold font-mono tracking-wider leading-none uppercase">JUNE</span>
-                              <span className="text-md font-bold font-display mt-0.5 leading-none">{hrg.hearingDate.split("-")[2]}</span>
+                      .map((hrg) => {
+                        const isUpcomingUrgent = isWithin7Days(hrg.hearingDate);
+                        const dateParts = hrg.hearingDate.split("-");
+                        const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+                        const monthIdx = dateParts[1] ? parseInt(dateParts[1], 10) - 1 : 5;
+                        const monthLabel = monthNames[monthIdx] || "JUN";
+                        const dayNum = dateParts[2] || "01";
+
+                        return (
+                          <div key={hrg.id} className={`py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 first:pt-0 last:pb-0 ${
+                            isUpcomingUrgent ? "bg-rose-50/50 p-2 rounded-lg border border-rose-200/50 mt-1 first:mt-0" : ""
+                          }`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`h-11 w-11 shrink-0 rounded-lg border flex flex-col items-center justify-center text-[10px] leading-tight ${
+                                isUpcomingUrgent 
+                                  ? "bg-rose-500 text-white border-rose-600 font-bold ring-2 ring-rose-200" 
+                                  : "bg-indigo-50 border-indigo-100 text-indigo-700 font-medium"
+                              }`}>
+                                <span className="text-[8.5px] uppercase font-mono tracking-wider leading-none mt-0.5">{monthLabel}</span>
+                                <span className="text-sm font-extrabold font-display leading-none mt-1">{dayNum}</span>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h4 className="text-xs font-bold text-slate-900 leading-snug">{hrg.matterTitle}</h4>
+                                  {isUpcomingUrgent && (
+                                    <span className="text-[8.5px] font-mono tracking-wider bg-rose-600 text-white font-extrabold px-1.5 py-0.5 rounded leading-none flex items-center justify-center gap-0.5 uppercase mb-0.5 animate-pulse">
+                                      Within 7 Days
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 block mt-0.5 flex items-center gap-1">
+                                  <span className="font-semibold text-indigo-700">{hrg.court}</span>
+                                  <span>•</span>
+                                  <span className="italic">Case Ref: {hrg.matterId}</span>
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <h4 className="text-xs font-bold text-slate-900 leading-snug">{hrg.matterTitle}</h4>
-                              <span className="text-[10px] text-slate-400 block mt-0.5 flex items-center gap-1">
-                                <span className="font-semibold text-indigo-700">{hrg.court}</span>
-                                <span>•</span>
-                                <span className="italic">Case Ref: {hrg.matterId}</span>
+                            
+                            <div className="text-left sm:text-right">
+                              <span className={`text-[10.5px] font-mono border px-2 py-0.5 rounded font-bold uppercase ${
+                                isUpcomingUrgent 
+                                  ? "bg-rose-100 text-rose-800 border-rose-200/50" 
+                                  : "bg-indigo-50 text-indigo-800 border-indigo-100/50"
+                              }`}>
+                                {hrg.company}
+                              </span>
+                              <span className="block text-[11px] text-slate-500 italic mt-1 max-w-[190px] truncate" title={hrg.remarks}>
+                                "{hrg.remarks}"
                               </span>
                             </div>
                           </div>
-                          
-                          <div className="text-left sm:text-right">
-                            <span className="text-[10.5px] font-mono bg-indigo-50 text-indigo-800 border border-indigo-100/50 px-2 py-0.5 rounded font-bold uppercase">
-                              {hrg.company}
-                            </span>
-                            <span className="block text-[11px] text-slate-500 italic mt-1 max-w-[190px] truncate" title={hrg.remarks}>
-                              "{hrg.remarks}"
-                            </span>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                   )}
                 </div>
               </div>
@@ -912,10 +999,23 @@ export default function App() {
 
               {/* Secure Systems Audit log stream */}
               <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs">
-                <h3 className="text-sm font-bold font-display text-slate-900 mb-4 flex items-center gap-1.5">
-                  <Clock className="h-4.5 w-4.5 text-slate-700" />
-                  Immutably Logged Audits
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold font-display text-slate-900 flex items-center gap-1.5 leading-none">
+                    <Clock className="h-4.5 w-4.5 text-slate-700 font-medium" />
+                    Secure Immutable Audits
+                  </h3>
+                  {["Auditor", "Super Admin"].includes(activeUser?.role || "") && (
+                    <button
+                      id="export-audit-csv-btn"
+                      onClick={handleDownloadAuditLogsCSV}
+                      className="text-[10px] bg-slate-50 hover:bg-slate-100 border text-slate-700 px-2 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer font-sans font-bold shadow-2xs"
+                      title="Download full immutable audit trail as a CSV file"
+                    >
+                      <Download className="h-3 w-3 text-indigo-600" />
+                      <span>Export CSV</span>
+                    </button>
+                  )}
+                </div>
 
                 <div className="space-y-3.5 max-h-80 overflow-y-auto pr-1">
                   {auditLogs.map((log) => (
@@ -947,6 +1047,54 @@ export default function App() {
         {selectedTab === "matters" && (
           <div className="space-y-6">
             
+            {/* Quick Action Highlight Filters */}
+            <div className="bg-slate-900 border border-slate-800 text-white rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 font-sans">
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-1 inline-block bg-indigo-500 rounded" />
+                <div>
+                  <span className="text-xs font-bold text-slate-100 block font-display leading-none">Smart Focus Highlighters</span>
+                  <span className="text-[10.5px] text-slate-400 block mt-1 font-sans">Filter database immediately by upcoming docket schedules or peak litigation exposures.</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap font-sans">
+                <button
+                  id="highlight-all"
+                  onClick={() => setMatterHighlightFilter("All Matters")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 border ${
+                    matterHighlightFilter === "All Matters"
+                      ? "bg-indigo-600 text-white border-indigo-650 shadow-2xs"
+                      : "bg-slate-800 text-slate-350 hover:bg-slate-700/50 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  All Active ({matters.length})
+                </button>
+                <button
+                  id="highlight-approaching"
+                  onClick={() => setMatterHighlightFilter("Approaching Hearing")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 border ${
+                    matterHighlightFilter === "Approaching Hearing"
+                      ? "bg-rose-605 bg-rose-600 text-white border-rose-600 shadow-2xs"
+                      : "bg-slate-800 text-slate-350 hover:text-white border-slate-700 hover:border-rose-500/30"
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                  Approaching Next Hearing ({matters.filter(m => m.nextHearingDate).length})
+                </button>
+                <button
+                  id="highlight-high-value"
+                  onClick={() => setMatterHighlightFilter("High Value Exposure")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 border ${
+                    matterHighlightFilter === "High Value Exposure"
+                      ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                      : "bg-slate-800 text-slate-350 hover:text-white border-slate-700 hover:border-amber-500/30"
+                  }`}
+                >
+                  <DollarSign className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  High Litigation Exposure &ge; 25L ({matters.filter(m => m.value >= 2500000).length})
+                </button>
+              </div>
+            </div>
+
             {/* Filter controls bar */}
             <div className="bg-white border border-slate-100 p-4 rounded-xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
               
