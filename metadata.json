@@ -1,0 +1,6 @@
+{
+  "name": "LRLMS",
+  "description": "Multi-tenant Legal Repository & Litigation Management System with safe isolation for Yajur, Bally Jute, and Yashoda, featuring simulated Google Drive tracking, comprehensive case lifecycles, and a Gemini-powered legal assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
