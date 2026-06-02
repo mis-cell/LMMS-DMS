@@ -164,13 +164,13 @@ export default function MatterCard({
         <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
           Case Lifecycle Status Transition Checklist
         </h4>
-        <div className="flex items-center justify-between overflow-x-auto py-2 px-1 gap-2 no-scrollbar">
+        <div className="flex items-center justify-between overflow-x-auto py-2.5 px-1 gap-2 no-scrollbar">
           {STAGES.map((stg, index) => (
             <button
               key={stg}
               id={`transition-stage-${matter.id}-${stg}`}
               onClick={() => onUpdateStatus(matter.id, stg)}
-              className="flex flex-col items-center flex-1 min-w-[70px] text-center focus:outline-none group cursor-pointer"
+              className="flex flex-col items-center flex-1 min-w-[70px] text-center focus:outline-none group cursor-pointer relative pb-2"
             >
               <motion.div
                 layout
@@ -203,6 +203,14 @@ export default function MatterCard({
               >
                 {stg}
               </span>
+
+              {matter.status === stg && (
+                <motion.div
+                  layoutId={`active-stage-indicator-${matter.id}`}
+                  className="absolute bottom-0 w-8 h-0.5 bg-indigo-600 rounded-full"
+                  transition={{ type: "spring", stiffness: 350, damping: 22 }}
+                />
+              )}
             </button>
           ))}
         </div>

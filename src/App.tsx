@@ -492,6 +492,20 @@ export default function App() {
     }
   };
 
+  // Frontend utility: checks if a template date is within 14 days of June 2, 2026
+  const isWithin14Days = (hearingDateStr: string | null | undefined): boolean => {
+    if (!hearingDateStr) return false;
+    try {
+      const today = new Date("2026-06-02");
+      const targetDate = new Date(hearingDateStr);
+      const timeDiff = targetDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return diffDays >= 0 && diffDays <= 14;
+    } catch {
+      return false;
+    }
+  };
+
   // Download Audit logs stream as a formatted CSV file
   const handleDownloadAuditLogsCSV = () => {
     if (!["Auditor", "Super Admin"].includes(activeUser?.role || "")) {
@@ -541,11 +555,11 @@ export default function App() {
 
     let matchesHighlight = true;
     if (matterHighlightFilter === "Approaching Hearing") {
-      // Approaching Hearing check: has aNextHearingDate set or any upcoming hearing under 7/8 days
-      matchesHighlight = !!m.nextHearingDate;
+      // Approaching Next Hearing within 14 days of reference template
+      matchesHighlight = m.nextHearingDate ? isWithin14Days(m.nextHearingDate) : false;
     } else if (matterHighlightFilter === "High Value Exposure") {
-      // High value exposure check: value filter >= 2.5 Million (25 Lakhs)
-      matchesHighlight = m.value >= 2500000;
+      // High value exposure check: value filter >= 50 Lakhs (5.0 Million)
+      matchesHighlight = m.value >= 5000000;
     }
 
     return matchesSearch && matchesStatus && matchesType && matchesHighlight;
@@ -763,7 +777,36 @@ export default function App() {
 
         {/* ==================== TAB 1: EXECUTIVE DASHBOARD ==================== */}
         {selectedTab === "dashboard" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="space-y-6">
+            {/* High-Priority Red Visual Badge & Alert Banner */}
+            {hearings.some(h => h.status === "Scheduled" && isWithin7Days(h.hearingDate)) && (
+              <div id="dashboard-high-priority-alert" className="bg-rose-50/70 border border-rose-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-300">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600"></span>
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span id="high-priority-badge" className="text-[9.5px] bg-rose-600 text-white font-extrabold px-1.5 py-0.5 rounded font-mono uppercase tracking-wider leading-none">
+                        High-Priority
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900 leading-none">Urgent Hearing Docket Deadline</h4>
+                    </div>
+                    <p className="text-[11px] text-rose-800 mt-1 font-medium">
+                      Judicial proceedings are scheduled to take place within the next 7 days. Prepare complete counsel briefs and documents immediately.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                  <span className="text-[10px] font-bold px-2 py-1 bg-white border border-rose-200 rounded-lg text-rose-700 font-mono shadow-3xs uppercase">
+                    {hearings.filter(h => h.status === "Scheduled" && isWithin7Days(h.hearingDate)).length} Case(s) Pending
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Left bento area - Graphical charts and upcoming calendars */}
             <div className="lg:col-span-8 space-y-6">
@@ -1041,6 +1084,7 @@ export default function App() {
 
             </div>
           </div>
+          </div>
         )}
 
         {/* ==================== TAB 2: MATTER MASTER LIST ==================== */}
@@ -1073,12 +1117,12 @@ export default function App() {
                   onClick={() => setMatterHighlightFilter("Approaching Hearing")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 border ${
                     matterHighlightFilter === "Approaching Hearing"
-                      ? "bg-rose-605 bg-rose-600 text-white border-rose-600 shadow-2xs"
+                      ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
                       : "bg-slate-800 text-slate-350 hover:text-white border-slate-700 hover:border-rose-500/30"
                   }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                  Approaching Next Hearing ({matters.filter(m => m.nextHearingDate).length})
+                  Approaching Next Hearing (&le; 14 Days) ({matters.filter(m => m.nextHearingDate && isWithin14Days(m.nextHearingDate)).length})
                 </button>
                 <button
                   id="highlight-high-value"
@@ -1090,7 +1134,7 @@ export default function App() {
                   }`}
                 >
                   <DollarSign className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                  High Litigation Exposure &ge; 25L ({matters.filter(m => m.value >= 2500000).length})
+                  High Litigation Exposure &ge; 50L ({matters.filter(m => m.value >= 5000000).length})
                 </button>
               </div>
             </div>
