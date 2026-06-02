@@ -46,11 +46,36 @@ import { handleClientSideFallback } from "./lib/client_api";
 
 // Resilient API Request Wrapper for fallback direct Supabase client sync
 async function apiRequest(url: string, options: any = {}): Promise<Response> {
+  const isStaticHosting = typeof window !== "undefined" && (
+    window.location.hostname.endsWith(".github.io") || 
+    window.location.href.includes("github.io") ||
+    (window.location.hostname === "localhost" && !process.env.NODE_ENV)
+  );
+
+  if (isStaticHosting && url.startsWith("/api/")) {
+    return await handleClientSideFallback(url, options);
+  }
+
   try {
     const res = await fetch(url, options);
-    if (res.status === 404 && url.startsWith("/api/")) {
+    
+    // Check if response is not OK, or has HTML content type (frequent on static SPAs)
+    const contentType = res.headers.get("content-type");
+    if (res.status === 404 || (contentType && contentType.includes("text/html"))) {
       return await handleClientSideFallback(url, options);
     }
+    
+    // Deep verification of the body text to catch HTML tags (like <!DOCTYPE html> or <html>)
+    try {
+      const clone = res.clone();
+      const text = (await clone.text()).trim();
+      if (text.startsWith("<") || text.includes("<!DOCTYPE html>") || text.includes("<html") || text.includes("</html>")) {
+        return await handleClientSideFallback(url, options);
+      }
+    } catch (e) {
+      // Ignore text-read errors and let original response pass
+    }
+
     return res;
   } catch (err) {
     if (url.startsWith("/api/")) {
@@ -614,13 +639,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* User/Company Isolation Select Dropdown */}
-          <div className="flex flex-wrap items-center gap-3 bg-slate-850/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div className="flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="text-xs text-slate-300 font-medium font-sans">Active Persona Clearance:</span>
-            </div>
-            
+          {/* User Switching Dropdown - Clean and friendly for business user */}
+          <div className="flex items-center gap-2 bg-slate-800/80 p-2 rounded-xl border border-slate-700/50">
+            <Users className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="text-xs text-slate-300 font-medium font-sans hidden sm:inline">Active User Account:</span>
             <select
               id="user-persona-simulator"
               value={activeUser?.id || ""}
@@ -631,37 +653,14 @@ export default function App() {
                   setSelectedTab("dashboard");
                 }
               }}
-              className="text-xs font-semibold bg-slate-900 border border-slate-700 hover:border-slate-600 text-white rounded px-2.5 py-1.5 max-w-[210px] outline-none cursor-pointer"
+              className="text-xs font-semibold bg-slate-900 border border-slate-700 hover:border-slate-650 text-white rounded px-2.5 py-1.5 max-w-[245px] outline-none cursor-pointer focus:ring-1 focus:ring-indigo-500"
             >
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name} ({u.role} - {u.company})
+                  {u.name} ({u.role === "Super Admin" ? "Admin" : u.role} - {u.company === "Group" ? "Enterprise Group" : u.company})
                 </option>
               ))}
             </select>
-
-            {/* Sync connection check badge */}
-            <div className="flex items-center gap-1 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded font-mono font-bold tracking-wide">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              SECURED ISOLATION
-            </div>
-
-            {/* Supabase PostgreSQL Interactive setup Monitor widget */}
-            {sysStatus && (
-              <button
-                id="open-supabase-setup-panel"
-                onClick={() => setShowDevPanel(true)}
-                className={`flex items-center gap-1 text-[10px] px-2.5 py-1 rounded font-mono font-bold tracking-wide transition cursor-pointer border ${
-                  sysStatus.active 
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20" 
-                    : "bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 animate-pulse"
-                }`}
-                title={sysStatus.active ? "Supabase PostgreSQL Connected. Click to inspect schemas & maps." : "Supabase tables not configured yet. Click to view configuration script."}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${sysStatus.active ? "bg-emerald-500" : "bg-amber-500 animate-ping"}`} />
-                <span>{sysStatus.active ? "SUPABASE ENCRYPTED" : "SUPABASE SETUP PENDING"}</span>
-              </button>
-            )}
           </div>
 
         </div>
@@ -1655,30 +1654,82 @@ export default function App() {
             <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-bold font-display text-slate-900 flex items-center gap-2">
-                  <span className="p-1 px-2.5 rounded bg-indigo-500 text-white font-mono text-xs">Simulators</span>
-                  Simulator User Administration Directory
+                  <span className="p-1 px-2.5 rounded bg-indigo-500 text-white font-mono text-[10px] tracking-wider uppercase font-bold">IDENTITY SIMULATOR</span>
+                  Portal Identity & Permission Control Directory
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 font-sans">
-                  Manage simulated enterprise accounts, adjust access roles, toggle Active statuses, and define multi-tenant portal routing mappings.
+                  Instantiate simulated personnel profiles, configure portal clearance divisions, adjust legal role scopes, and inspect active database integrations.
                 </p>
               </div>
 
-              <button
-                id="add-new-simulator-user-btn"
-                onClick={() => {
-                  setEditingUser(null);
-                  setUsrName("");
-                  setUsrEmail("");
-                  setUsrCompany("Yajur");
-                  setUsrRole("Lawyer");
-                  setUsrStatus("Active");
-                  setShowUserModal(true);
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition cursor-pointer select-none"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Simulated Account</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {sysStatus && (
+                  <button
+                    id="open-supabase-setup-panel"
+                    onClick={() => setShowDevPanel(true)}
+                    className="border border-slate-200 hover:border-slate-350 text-slate-700 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition cursor-pointer select-none shadow-xs"
+                    title={sysStatus.active ? "Supabase PostgreSQL Connection Configured" : "Configure Supabase DB credentials"}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 text-amber-500 ${sysStatus.active ? "" : "animate-spin"}`} />
+                    <span>Database Schema & APIs</span>
+                  </button>
+                )}
+
+                <button
+                  id="add-new-simulator-user-btn"
+                  onClick={() => {
+                    setEditingUser(null);
+                    setUsrName("");
+                    setUsrEmail("");
+                    setUsrCompany("Yajur");
+                    setUsrRole("Lawyer");
+                    setUsrStatus("Active");
+                    setShowUserModal(true);
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition cursor-pointer select-none shadow-xs font-sans"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add New Account</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Simple User Clearance Guide / Explanation Card */}
+            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl p-6 shadow-xs font-sans flex flex-col md:flex-row gap-5 items-start border border-indigo-950/40">
+              <div className="p-3 bg-indigo-500/20 rounded-xl border border-indigo-400/20 text-indigo-300 md:self-center shrink-0">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white mb-1.5 font-display flex items-center gap-2">
+                  System Guide: How are permissions mapped dynamically?
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                  This Management System isolates corporate data across multiple divisions automatically. 
+                  When you switch characters or edit a user profile, the portal isolates litigation values, contracts, and notifications based on the following configurations:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-[11px] text-slate-300 font-sans">
+                  <div className="space-y-1.5">
+                    <p className="flex items-start gap-1">
+                      <span className="text-indigo-400 font-bold">•</span>
+                      <span><strong>Division Bound Clearances (Yajur, Bally, Yashoda):</strong> Restricted to legal files belonging strictly to their assigned business entity.</span>
+                    </p>
+                    <p className="flex items-start gap-1">
+                      <span className="text-indigo-400 font-bold">•</span>
+                      <span><strong>Enterprise Group Clearance (Group IQ):</strong> Allows complete multi-tenant administration. You can view, compare, and modify files across every division at once.</span>
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="flex items-start gap-1">
+                      <span className="text-indigo-400 font-bold">•</span>
+                      <span><strong>Access Scopes:</strong> <em>Lawyers/Heads</em> can create matters, log hearings, and progress cases; <em>Auditors</em> have exclusive read-only coverage; and <em>Viewers</em> cannot view litigation risk models.</span>
+                    </p>
+                    <p className="flex items-start gap-1">
+                      <span className="text-indigo-400 font-bold">•</span>
+                      <span><strong>How to Switch:</strong> Simply use the <strong>Active User Account</strong> dropdown in the top-right header to toggle simulated views instantly.</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1981,48 +2032,54 @@ export default function App() {
                           id="user-form-role-select"
                           value={usrRole}
                           onChange={(e) => setUsrRole(e.target.value as any)}
-                          className="w-full mt-1.5 p-2 bg-slate-50 border border-slate-250 rounded-lg text-xs outline-none"
+                          className="w-full mt-1.5 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 cursor-pointer font-medium"
                         >
-                          <option value="Super Admin">Super Admin</option>
+                          <option value="Super Admin">Admin (Full Access)</option>
                           <option value="Company Admin">Company Admin</option>
                           <option value="Legal Head">Legal Head</option>
                           <option value="Manager">Manager</option>
                           <option value="Lawyer">Lawyer</option>
-                          <option value="Viewer">Viewer</option>
-                          <option value="Auditor">Auditor</option>
+                          <option value="Viewer">Viewer (Read Only)</option>
+                          <option value="Auditor">Auditor (Full Audit)</option>
                         </select>
+                        <span className="text-[10px] text-slate-400 block mt-1 leading-normal">
+                          Defines read/write permission scopes.
+                        </span>
                       </div>
 
                       <div>
-                        <label className="text-xs text-slate-600 block font-bold uppercase tracking-wide">Status</label>
+                        <label className="text-xs text-slate-600 block font-bold uppercase tracking-wide">Account Status</label>
                         <select
                           id="user-form-status-select"
                           value={usrStatus}
                           onChange={(e) => setUsrStatus(e.target.value as any)}
-                          className="w-full mt-1.5 p-2 bg-slate-50 border border-slate-250 rounded-lg text-xs outline-none"
+                          className="w-full mt-1.5 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 cursor-pointer font-medium"
                         >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
+                          <option value="Active">Active (Permit Access)</option>
+                          <option value="Inactive">Disabled / Suspended</option>
                         </select>
+                        <span className="text-[10px] text-slate-400 block mt-1 leading-normal">
+                          Disable to block simulator login.
+                        </span>
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-xs text-slate-600 block font-bold uppercase tracking-wide text-xs">Corporate Portal Assignment</label>
-                      <span className="text-[10px] text-slate-400 block mt-0.5 leading-none font-sans">
-                        Governs data isolation logic parameters.
-                      </span>
+                      <label className="text-xs text-slate-600 block font-bold uppercase tracking-wide text-xs">Division & Portal Clearance</label>
                       <select
                         id="user-form-company-select"
                         value={usrCompany}
                         onChange={(e) => setUsrCompany(e.target.value as any)}
-                        className="w-full mt-1.5 p-2 bg-slate-50 border border-slate-250 rounded-lg text-xs outline-none"
+                        className="w-full mt-1.5 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 cursor-pointer font-medium"
                       >
                         <option value="Yajur">Yajur Corporate Division</option>
                         <option value="Bally Jute">Bally Jute Industry Division</option>
                         <option value="Yashoda">Yashoda Healthcare Division</option>
-                        <option value="Group">Global Enterprise Group HQ (All Portals)</option>
+                        <option value="Group">Global Enterprise HQ (Access All Portals)</option>
                       </select>
+                      <span className="text-[10.5px] text-indigo-500 block mt-1.5 leading-normal font-medium bg-indigo-50/60 p-2 rounded border border-indigo-100/50">
+                        🔒 <strong>Security Standard:</strong> Data isolation strictly prevents users assigned to individual divisions from accessing folders or litigation metrics of external divisions.
+                      </span>
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2 text-xs font-sans">

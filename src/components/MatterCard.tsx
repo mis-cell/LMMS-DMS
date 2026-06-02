@@ -69,7 +69,11 @@ export default function MatterCard({
   };
 
   return (
-    <div 
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
       id={`matter-card-${matter.id}`}
       className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs hover:shadow-md transition-shadow duration-200 text-slate-800"
     >
@@ -367,6 +371,6 @@ export default function MatterCard({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
