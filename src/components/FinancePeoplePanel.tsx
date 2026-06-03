@@ -126,8 +126,8 @@ export default function FinancePeoplePanel({
             </div>
           </div>
 
-          <div className="bg-white border rounded-xl overflow-hidden shadow-xs">
-            <table className="w-full text-xs font-sans text-slate-700">
+          <div className="bg-white border rounded-xl overflow-x-auto shadow-xs">
+            <table className="w-full min-w-[850px] text-xs font-sans text-slate-700">
               <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
                 <tr className="text-left">
                   <th className="p-3.5 pl-5 uppercase text-[10px] tracking-wider">Invoice No.</th>
@@ -221,8 +221,8 @@ export default function FinancePeoplePanel({
       )}
 
       {tab === "contacts" && (
-        <div className="bg-white border rounded-xl overflow-hidden shadow-xs">
-          <table className="w-full text-xs font-sans text-slate-700">
+        <div className="bg-white border rounded-xl overflow-x-auto shadow-xs">
+          <table className="w-full min-w-[850px] text-xs font-sans text-slate-700">
             <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
               <tr className="text-left font-sans col-span-1 border-slate-150">
                 <th className="p-3.5 pl-5 uppercase text-[10px] tracking-wider pl-5">Full Name Address</th>

@@ -40,6 +40,7 @@ export default function MattersPanel({
 }: MattersPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
+  const [classificationFilter, setClassificationFilter] = useState<"All" | "Litigation" | "Contract" | "Regulatory" | "IP/Trademark" | "Labor Matter" | "Property">("All");
   const [selectedMatterIds, setSelectedMatterIds] = useState<Set<string>>(new Set());
 
   // Determine active item type mapping to this tab
@@ -68,7 +69,7 @@ export default function MattersPanel({
 
   const listItems = getTabMatters();
 
-  // Filter items matching user search and status dropdowns
+  // Filter items matching user search, status dropdowns, and classifications
   const filteredList = listItems.filter(m => {
     const matchesSearch = 
       m.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -78,8 +79,9 @@ export default function MattersPanel({
       m.externalCounsel.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === "All Statuses" || m.status === statusFilter;
+    const matchesClassification = classificationFilter === "All" || m.type === classificationFilter;
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesClassification;
   });
 
   // Unique counts for subtab KPIs
@@ -157,8 +159,8 @@ export default function MattersPanel({
             </div>
           </div>
 
-          <div className="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-xs">
-            <table className="w-full text-xs font-sans text-slate-700">
+          <div className="bg-white border border-slate-100 rounded-xl overflow-x-auto shadow-xs">
+            <table className="w-full min-w-[700px] text-xs font-sans text-slate-700">
               <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
                 <tr className="text-left">
                   <th className="p-3.5 uppercase text-[10px] tracking-wider pl-5">Compliance Obligation</th>
@@ -222,6 +224,37 @@ export default function MattersPanel({
             </select>
           </div>
 
+          {/* Secondary Classification Filter Bar */}
+          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 flex items-center gap-1.5 overflow-x-auto select-none">
+            <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400 px-3 select-none flex items-center gap-1 shrink-0">
+              <Filter className="w-3.5 h-3.5 text-slate-400" /> Toggle Classification:
+            </span>
+            {[
+              { id: "All", label: "All Portfolios" },
+              { id: "Litigation", label: "Litigation Cases" },
+              { id: "Contract", label: "Agreements & Contracts" },
+              { id: "Regulatory", label: "Regulatory Compliance" },
+              { id: "IP/Trademark", label: "Intellectual Property" },
+              { id: "Labor Matter", label: "Labor Disputes" },
+              { id: "Property", label: "Property & Real Estate" }
+            ].map((clazz) => {
+              const active = classificationFilter === clazz.id;
+              return (
+                <button
+                  key={clazz.id}
+                  onClick={() => setClassificationFilter(clazz.id as any)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition duration-150 cursor-pointer text-nowrap whitespace-nowrap border ${
+                    active 
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-3xs" 
+                      : "bg-white text-slate-650 text-slate-600 border-slate-200/50 hover:text-slate-900 hover:bg-slate-50/70"
+                  }`}
+                >
+                  {clazz.label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Bulk Action Header */}
           {selectedMatterIds.size > 0 && (
             <div className="bg-indigo-50 border border-indigo-150 p-4 rounded-xl flex items-center justify-between flex-wrap gap-4 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -266,7 +299,7 @@ export default function MattersPanel({
           )}
 
           {/* Database Grid */}
-          <div className="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-xs">
+          <div className="bg-white border border-slate-100 rounded-xl overflow-x-auto shadow-xs">
             {filteredList.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 <Briefcase className="w-10 h-10 mx-auto text-slate-300 mb-2" />
@@ -274,7 +307,7 @@ export default function MattersPanel({
                 <p className="text-xs text-slate-500 mt-1">Refine your search parameters or register a new matter folder.</p>
               </div>
             ) : (
-              <table className="w-full text-xs text-slate-600 font-sans">
+              <table className="w-full min-w-[850px] text-xs text-slate-600 font-sans">
                 <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
                   <tr className="text-left">
                     <th className="p-3.5 pl-5 w-12 text-center">

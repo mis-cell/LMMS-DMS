@@ -58,54 +58,56 @@ export default function CalendarPanel({ hearings, effectiveCompany, theme }: Cal
             <span className="text-xs font-semibold px-2.5 py-1 bg-slate-50 border rounded-lg text-slate-400">Standard Grid View</span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 text-center">
-            {/* Headers */}
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
-              <div key={d} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest py-1">{d}</div>
-            ))}
+          <div className="overflow-x-auto">
+            <div className="grid grid-cols-7 gap-1.5 text-center min-w-[550px] md:min-w-0">
+              {/* Headers */}
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
+                <div key={d} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest py-1">{d}</div>
+              ))}
 
-            {/* Empty boxes if any (June 1, 2026 is indeed a Monday, so 0 offset!) */}
-            {GRID_DAYS.map(dayNum => {
-              const dayEvents = getDayEvents(dayNum);
-              const isToday = dayNum === 3;
-              const isSelected = selectedDay === dayNum;
+              {/* Empty boxes if any (June 1, 2026 is indeed a Monday, so 0 offset!) */}
+              {GRID_DAYS.map(dayNum => {
+                const dayEvents = getDayEvents(dayNum);
+                const isToday = dayNum === 3;
+                const isSelected = selectedDay === dayNum;
 
-              return (
-                <div 
-                  key={dayNum} 
-                  onClick={() => setSelectedDay(dayNum)}
-                  className={`min-h-[84px] border border-slate-100/60 rounded-xl p-2 text-left cursor-pointer transition-all flex flex-col justify-between ${
-                    isSelected ? "ring-2 ring-indigo-500 border-indigo-200" : "hover:bg-slate-50/60"
-                  } ${isToday ? "bg-indigo-50/50" : "bg-white"}`}
-                >
-                  <div className="flex justify-between items-center leading-none">
-                    <span className={`text-xs font-bold ${isToday ? "text-indigo-600" : "text-slate-400"}`}>
-                      {dayNum}
-                    </span>
-                    {isToday && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping" />
-                    )}
+                return (
+                  <div 
+                    key={dayNum} 
+                    onClick={() => setSelectedDay(dayNum)}
+                    className={`min-h-[84px] border border-slate-100/60 rounded-xl p-2 text-left cursor-pointer transition-all flex flex-col justify-between ${
+                      isSelected ? "ring-2 ring-indigo-500 border-indigo-200" : "hover:bg-slate-50/60"
+                    } ${isToday ? "bg-indigo-50/50" : "bg-white"}`}
+                  >
+                    <div className="flex justify-between items-center leading-none">
+                      <span className={`text-xs font-bold ${isToday ? "text-indigo-600" : "text-slate-400"}`}>
+                        {dayNum}
+                      </span>
+                      {isToday && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping" />
+                      )}
+                    </div>
+
+                    <div className="mt-2 space-y-1 overflow-hidden max-h-[48px]">
+                      {dayEvents.map(evt => (
+                        <div 
+                          key={evt.id} 
+                          className="text-[9px] font-bold truncate px-1 py-0.5 rounded border"
+                          style={{
+                            backgroundColor: evt.company === "Yajur" ? "#E6F1FB" : evt.company === "Bally Jute" ? "#FAEEDA" : "#EAF3DE",
+                            color: evt.company === "Yajur" ? "#0C447C" : evt.company === "Bally Jute" ? "#854F0B" : "#3B6D11",
+                            borderColor: "transparent"
+                          }}
+                          title={evt.matterTitle}
+                        >
+                          {evt.status === "Scheduled" ? "⚖️ " : ""} {evt.matterTitle}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-
-                  <div className="mt-2 space-y-1 overflow-hidden max-h-[48px]">
-                    {dayEvents.map(evt => (
-                      <div 
-                        key={evt.id} 
-                        className="text-[9px] font-bold truncate px-1 py-0.5 rounded border"
-                        style={{
-                          backgroundColor: evt.company === "Yajur" ? "#E6F1FB" : evt.company === "Bally Jute" ? "#FAEEDA" : "#EAF3DE",
-                          color: evt.company === "Yajur" ? "#0C447C" : evt.company === "Bally Jute" ? "#854F0B" : "#3B6D11",
-                          borderColor: "transparent"
-                        }}
-                        title={evt.matterTitle}
-                      >
-                        {evt.status === "Scheduled" ? "⚖️ " : ""} {evt.matterTitle}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
 

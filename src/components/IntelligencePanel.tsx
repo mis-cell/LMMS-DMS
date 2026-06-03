@@ -387,8 +387,8 @@ export default function IntelligencePanel({
             })()}
           </div>
 
-          <div className="bg-white border rounded-xl overflow-hidden shadow-xs">
-            <table className="w-full text-xs font-sans text-slate-705 text-slate-600">
+          <div className="bg-white border rounded-xl overflow-x-auto shadow-xs">
+            <table className="w-full min-w-[850px] text-xs font-sans text-slate-705 text-slate-600">
               <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
                 <tr className="text-left">
                   <th className="p-3.5 pl-5 uppercase text-[10px] tracking-wider pl-5">Timestamp</th>

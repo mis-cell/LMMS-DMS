@@ -8,6 +8,7 @@ import {
   PlusCircle, 
   CheckCircle2, 
   X,
+  Menu,
   ChevronRight,
   RefreshCw,
   Download,
@@ -33,7 +34,8 @@ import {
   Trash2,
   CalendarCheck,
   FileText,
-  ShieldAlert
+  ShieldAlert,
+  AlertTriangle
 } from "lucide-react";
 
 import { User, Matter, LegalDocument, LegalNotice, Hearing, AuditLog, CompanyType, MatterType, MatterStatus } from "./types";
@@ -87,6 +89,7 @@ export default function App() {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [effectiveCompany, setEffectiveCompany] = useState<string>("Yajur");
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // Global State database
   const [matters, setMatters] = useState<Matter[]>([]);
@@ -285,6 +288,28 @@ export default function App() {
         }
       });
 
+      // Scan and flag Stagnant Matters (inactive for 30+ days)
+      matters.forEach((mat) => {
+        if (mat.status === "Closed") return;
+        const baseDateStr = mat.lastUpdatedOn || mat.createdOn;
+        if (!baseDateStr) return;
+        const baseDate = new Date(baseDateStr);
+        const diffMs = today.getTime() - baseDate.getTime();
+        const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1050));
+        
+        if (diffDays >= 30) {
+          activeAlerts.push({
+            id: `STAGNANT-${mat.id}`,
+            company: mat.company,
+            title: `STAGNANT CASE ALERT: Matter "${mat.title}" has had no stage progressions for ${diffDays} days.`,
+            type: "Matter Status Stagnant",
+            dueDate: baseDateStr,
+            daysLeft: diffDays,
+            assignee: mat.createdBy || "Senior Legal Counsel"
+          });
+        }
+      });
+
       if (activeAlerts.length > 0) {
         // Trigger visual alerts
         const unsilencedCount = activeAlerts.filter(act => !silencedAlertIds.has(act.id)).length;
@@ -313,7 +338,7 @@ export default function App() {
     runCronCheck();
     const cronInterval = setInterval(runCronCheck, 15000);
     return () => clearInterval(cronInterval);
-  }, [tasks, notices, silencedAlertIds]);
+  }, [tasks, notices, matters, silencedAlertIds]);
 
   // Adjust company view isolation if user toggles context
   const handleCompanySwitch = (co: string) => {
@@ -647,23 +672,47 @@ export default function App() {
     setMatchedEntities(compiled);
   };
 
+  const handleNavSelect = (tabId: string) => {
+    setActiveTab(tabId);
+    setIsSidebarOpen(false);
+  };
+
   const theme = COMPANY_THEMES[effectiveCompany] || COMPANY_THEMES["Yajur"];
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden text-xs">
+    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden text-xs relative">
+      
+      {/* MOBILE DRAWER BACKDROP MASK */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-xs"
+        />
+      )}
       
       {/* LEFT SIDEBAR NAVIGATION */}
-      <div className="w-64 bg-slate-900 text-slate-300 shrink-0 flex flex-col justify-between select-none">
+      <div className={`fixed inset-y-0 left-0 w-64 bg-slate-900 text-slate-300 z-50 flex flex-col justify-between select-none transform transition-transform duration-300 ease-in-out ${
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      } lg:relative lg:translate-x-0 shrink-0 h-full`}>
         <div>
-          {/* Logo Brand Header */}
-          <div className="p-5 border-b border-slate-800 flex items-center gap-2.5">
-            <div className="bg-indigo-600/10 p-2 rounded-xl border border-indigo-500/20">
-              <Scale className="h-5 w-5 text-indigo-400" />
+          {/* Logo Brand Header & Mobile Close button */}
+          <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="bg-indigo-600/10 p-2 rounded-xl border border-indigo-500/20">
+                <Scale className="h-5 w-5 text-indigo-400" />
+              </div>
+              <div>
+                <h1 className="font-bold text-[14px] tracking-tight text-white font-display uppercase tracking-widest leading-none">LRLMS Portal</h1>
+                <span className="text-[10px] text-slate-500 mt-1 block">Risk Management DMS</span>
+              </div>
             </div>
-            <div>
-              <h1 className="font-bold text-[14px] tracking-tight text-white font-display uppercase tracking-widest leading-none">LRLMS Portal</h1>
-              <span className="text-[10px] text-slate-500 mt-1 block">Risk Management DMS</span>
-            </div>
+            {/* Close button inside sidebar on mobile */}
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Company Selector Widget (Yajur, Bally Jute, Yashoda) */}
@@ -681,7 +730,10 @@ export default function App() {
                 return (
                   <button
                     key={co.key}
-                    onClick={() => handleCompanySwitch(co.key)}
+                    onClick={() => {
+                      handleCompanySwitch(co.key);
+                      setIsSidebarOpen(false);
+                    }}
                     className={`w-full p-2.5 rounded-lg flex items-center gap-2 text-left text-xs font-semibold cursor-pointer transition ${
                       isActive 
                         ? "bg-slate-800 text-white border border-slate-700 shadow-sm" 
@@ -712,7 +764,7 @@ export default function App() {
                 ].map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setActiveTab(t.id)}
+                    onClick={() => handleNavSelect(t.id)}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-left truncate font-semibold block cursor-pointer text-xs ${
                       activeTab === t.id ? "bg-indigo-600 font-bold text-white shadow-xs" : "hover:text-white"
                     }`}
@@ -739,7 +791,7 @@ export default function App() {
                 ].map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setActiveTab(t.id)}
+                    onClick={() => handleNavSelect(t.id)}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-left truncate font-semibold block cursor-pointer text-xs ${
                       activeTab === t.id ? "bg-indigo-600 font-bold text-white shadow-xs" : "hover:text-white"
                     }`}
@@ -763,7 +815,7 @@ export default function App() {
                 ].map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setActiveTab(t.id)}
+                    onClick={() => handleNavSelect(t.id)}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-left truncate font-semibold block cursor-pointer text-xs ${
                       activeTab === t.id ? "bg-indigo-600 font-bold text-white shadow-xs" : "hover:text-white"
                     }`}
@@ -786,7 +838,7 @@ export default function App() {
                 ].map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setActiveTab(t.id)}
+                    onClick={() => handleNavSelect(t.id)}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-left truncate font-semibold block cursor-pointer text-xs ${
                       activeTab === t.id ? "bg-indigo-600 font-bold text-white shadow-xs" : "hover:text-white"
                     }`}
@@ -808,7 +860,7 @@ export default function App() {
                 ].map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setActiveTab(t.id)}
+                    onClick={() => handleNavSelect(t.id)}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-left truncate font-semibold block cursor-pointer text-xs ${
                       activeTab === t.id ? "bg-indigo-600 font-bold text-white shadow-xs" : "hover:text-white"
                     }`}
@@ -828,7 +880,7 @@ export default function App() {
                 ].map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setActiveTab(t.id)}
+                    onClick={() => handleNavSelect(t.id)}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-left truncate font-semibold block cursor-pointer text-xs ${
                       activeTab === t.id ? "bg-indigo-600 font-bold text-white shadow-xs" : "hover:text-white"
                     }`}
@@ -874,29 +926,38 @@ export default function App() {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         
         {/* TOP BAR HEADER */}
-        <div id="header" className="h-16 border-b border-slate-200/50 bg-white flex items-center justify-between px-6 shrink-0 select-none">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-bold font-display text-slate-805 text-slate-800">
-              {activeTab === "dashboard" && "Enterprise Executive Hub"}
-              {activeTab === "calendar" && "Trial Court dockets schedule"}
+        <div id="header" className="min-h-16 border-b border-slate-200/50 bg-white flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 py-3 shrink-0 select-none gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Hamburger button on mobile */}
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden p-2 -ml-1.5 text-slate-500 hover:text-slate-850 hover:bg-slate-50 rounded-lg cursor-pointer"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <h2 className="text-sm font-bold font-display text-slate-805 text-slate-805 text-slate-800">
+              {activeTab === "dashboard" && "Executive Hub"}
+              {activeTab === "calendar" && "Court Schedule"}
               {["matters", "litigation", "contracts", "compliance", "ip", "employment", "property", "tax"].includes(activeTab) && "Dockets Portfolio Listing"}
               {["dms", "templates", "approvals", "esign", "archive"].includes(activeTab) && "GDrive DMS Vault"}
-              {["invoices", "counsels", "contacts", "tasks"].includes(activeTab) && "Billing, Task boards and Roster Directories"}
+              {["invoices", "counsels", "contacts", "tasks"].includes(activeTab) && "Directory & Tasks"}
               {activeTab === "ai" && "Gemini Co-Counsel Suite"}
-              {activeTab === "reports" && "Enterprise Analytical charts"}
-              {activeTab === "audit" && "PostgreSQL Logs trace"}
-              {activeTab === "settings" && "Config dashboard parameters"}
+              {activeTab === "reports" && "Enterprise Analytics"}
+              {activeTab === "audit" && "Audit Trail logs"}
+              {activeTab === "settings" && "Config parameters"}
             </h2>
 
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-bold text-slate-400 animate-pulse mt-0.5 font-mono">|</span>
               <span className={`px-2 py-0.5 rounded text-[9.5px] font-extrabold uppercase border font-mono ${theme.tag}`}>
-                Isolated workspace: {effectiveCompany}
+                {effectiveCompany}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center flex-wrap gap-2.5">
             {activeTab === "calendar" && ["Super Admin", "Company Admin", "Legal Head"].includes(activeUser?.role || "") && (
               <button
                 onClick={() => {
@@ -908,35 +969,39 @@ export default function App() {
                   });
                   setShowHearingModal(true);
                 }}
-                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
-                <PlusCircle className="w-4 h-4" />
-                <span>Schedule Court Hearing</span>
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Schedule Hearing</span>
               </button>
             )}
 
             {/* Global search trigger */}
             <button 
               onClick={() => setShowSearchModal(true)}
-              className="p-2 hover:bg-slate-50 border rounded-lg text-slate-500 hover:text-slate-800 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+              className="p-2 hover:bg-slate-50 border rounded-lg text-slate-500 hover:text-slate-800 transition cursor-pointer flex items-center gap-1.5 text-[11px] font-semibold"
             >
-              <Search className="w-4 h-4" />
-              <span>Search Database...</span>
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Search Database...</span>
+              <span className="sm:hidden">Search</span>
             </button>
 
             {/* Quick action buttons */}
             <button
-              onClick={() => setActiveTab("ai")}
-              className="px-3 py-2 bg-slate-900 text-indigo-300 hover:bg-slate-800 rounded-lg text-xs font-bold transition flex items-center gap-1.5 hover:shadow-xs cursor-pointer"
+              onClick={() => {
+                setActiveTab("ai");
+                setIsSidebarOpen(false);
+              }}
+              className="px-2.5 py-1.5 bg-slate-900 text-indigo-300 hover:bg-slate-800 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 hover:shadow-xs cursor-pointer"
             >
-              <Bot className="w-4 h-4" />
-              <span>Ask Gemini Co-Counsel</span>
+              <Bot className="w-3.5 h-3.5" />
+              <span>Ask Gemini</span>
             </button>
 
             {/* User simulator modal triggers */}
             <button
               onClick={() => setShowUserModal(true)}
-              className="p-2 border rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer text-xs font-semibold"
+              className="p-2 border rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer text-[11px] font-semibold"
               title="Simulator user profile settings"
             >
               Add User profile
@@ -954,6 +1019,7 @@ export default function App() {
               documents={documents}
               notices={notices}
               hearings={hearings}
+              auditLogs={auditLogs}
               effectiveCompany={effectiveCompany}
               onTabChange={setActiveTab}
               theme={theme}
@@ -1970,42 +2036,62 @@ export default function App() {
       {/* CRON MONITOR SERVICE ALERT ALARM FLOATING STACK */}
       {cronAlerts.length > 0 && (
         <div className="fixed bottom-5 right-5 z-45 space-y-3.5 w-96 font-sans max-h-[400px] overflow-y-auto">
-          {cronAlerts.map((alert) => (
-            <div 
-              key={alert.id}
-              className="bg-slate-900 text-white border-l-4 border-rose-500 rounded-lg shadow-2xl p-4 animate-in slide-in-from-bottom-6 duration-300 relative border border-slate-800"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="p-1 rounded bg-rose-500/10 text-rose-500"><Bell className="w-4 h-4 animate-bounce" /></span>
-                  <span className="text-rose-505 text-rose-500 text-[10.5px] uppercase tracking-widest font-black">CRON WARNING SERVICE</span>
+          {cronAlerts.map((alert) => {
+            const isStagnant = alert.type === "Matter Status Stagnant";
+            return (
+              <div 
+                key={alert.id}
+                className={`bg-slate-900 text-white border-l-4 ${
+                  isStagnant ? "border-amber-500" : "border-rose-500"
+                } rounded-lg shadow-2xl p-4 animate-in slide-in-from-bottom-6 duration-300 relative border border-slate-800`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-1.5 font-sans">
+                    <span className={`p-1 rounded ${
+                      isStagnant ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-500"
+                    }`}>
+                      <AlertTriangle className={`w-4 h-4 ${isStagnant ? "" : "animate-bounce"}`} />
+                    </span>
+                    <span className={`text-[10px] uppercase tracking-widest font-black ${
+                      isStagnant ? "text-amber-400" : "text-rose-500"
+                    }`}>
+                      {isStagnant ? "STAGNANT MATTER FLAG" : "CRON WARNING SERVICE"}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSilencedAlertIds(prev => {
+                        const updated = new Set(prev);
+                        updated.add(alert.id);
+                        return updated;
+                      });
+                    }}
+                    className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
+                    title="Close and Silence this alert warning"
+                  >
+                    Dismiss &times;
+                  </button>
                 </div>
-                <button 
-                  onClick={() => {
-                    setSilencedAlertIds(prev => {
-                      const updated = new Set(prev);
-                      updated.add(alert.id);
-                      return updated;
-                    });
-                  }}
-                  className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
-                  title="Close and Silence this alert warning"
-                >
-                  Dismiss &times;
-                </button>
-              </div>
 
-              <div className="mt-3.5 space-y-1.5">
-                <h5 className="text-slate-100 font-bold leading-normal text-xs font-mono">{alert.title}</h5>
-                <p className="text-[10px] text-slate-400 font-medium">Clearance Tenant Context: <strong className="text-[#185FA5] text-indigo-300">{alert.company}</strong></p>
-                
-                <div className="flex items-center justify-between text-[10.5px] text-rose-405 text-rose-400 font-bold bg-rose-950/20 border border-rose-900/30 py-1 px-2 rounded-md mt-2">
-                  <span>EXPIRING IN: {alert.daysLeft} DAYS</span>
-                  <span className="font-mono">Deadline limits: {new Date(alert.dueDate).toLocaleDateString()}</span>
+                <div className="mt-3 space-y-1.5">
+                  <h5 className="text-slate-100 font-bold leading-normal text-xs font-mono">{alert.title}</h5>
+                  <p className="text-[10px] text-slate-400 font-medium">Clearance Tenant Context: <strong className="text-indigo-300">{alert.company}</strong></p>
+                  
+                  {isStagnant ? (
+                    <div className="flex items-center justify-between text-[10px] text-amber-400 font-bold bg-amber-950/20 border border-amber-900/30 py-1 px-2 rounded-md mt-2">
+                      <span>INACTIVE PORTFOLIO FLAG</span>
+                      <span className="font-mono">Last updated: {new Date(alert.dueDate).toLocaleDateString()}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-[10px] text-rose-400 font-bold bg-rose-950/20 border border-rose-905/30 border-rose-900/30 py-1 px-2 rounded-md mt-2">
+                       <span>EXPIRING IN: {alert.daysLeft} DAYS</span>
+                       <span className="font-mono font-normal">Deadline limits: {new Date(alert.dueDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

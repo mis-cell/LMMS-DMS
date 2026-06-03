@@ -16,13 +16,14 @@ import {
   ChevronRight,
   Database
 } from "lucide-react";
-import { Matter, LegalDocument, LegalNotice, Hearing } from "../types";
+import { Matter, LegalDocument, LegalNotice, Hearing, AuditLog } from "../types";
 
 interface DashboardPanelProps {
   matters: Matter[];
   documents: LegalDocument[];
   notices: LegalNotice[];
   hearings: Hearing[];
+  auditLogs: AuditLog[];
   effectiveCompany: string;
   onTabChange: (tab: string) => void;
   theme: any;
@@ -34,6 +35,7 @@ export default function DashboardPanel({
   documents,
   notices,
   hearings,
+  auditLogs,
   effectiveCompany,
   onTabChange,
   theme,
@@ -51,6 +53,45 @@ export default function DashboardPanel({
   const pendingApprovalsCount = companyDocuments.length > 0 ? Math.ceil(companyDocuments.length * 0.15) : 4;
   const upcomingHearingsCount = companyHearings.filter(h => h.status === "Scheduled").length;
   
+  // Counts: matters with status not modified for 30 days
+  const today = new Date("2026-06-03");
+  const stagnantCount = companyMatters.filter(m => {
+    if (m.status === "Closed") return false;
+    const updateStr = m.lastUpdatedOn || m.createdOn;
+    if (!updateStr) return false;
+    const diff = today.getTime() - new Date(updateStr).getTime();
+    return Math.floor(diff / (24 * 60 * 60 * 1050)) >= 30;
+  }).length;
+
+  // Recent 5 audit logs belonging to active tenant context
+  const companyAuditLogs = (auditLogs || [])
+    .filter(log => effectiveCompany === "Group" || log.company === effectiveCompany)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 5);
+
+  const getInitials = (name: string) => {
+    if (!name) return "SYS";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const getLogBadgeColors = (action: string) => {
+    const act = action.toLowerCase();
+    if (act.includes("delete") || act.includes("warning") || act.includes("remove")) {
+      return "bg-rose-50 text-rose-600 border border-rose-100";
+    }
+    if (act.includes("added") || act.includes("create") || act.includes("upload")) {
+      return "bg-emerald-50 text-emerald-600 border border-emerald-100";
+    }
+    if (act.includes("edit") || act.includes("update") || act.includes("transition")) {
+      return "bg-amber-50 text-amber-600 border border-amber-100";
+    }
+    return "bg-indigo-50 text-indigo-600 border border-indigo-100";
+  };
+
   // Custom mock exposure calculation in Lakhs (L)
   const totalExposureValue = companyMatters.reduce((sum, m) => sum + m.value, 0);
   const formattedExposureLakhs = totalExposureValue > 0 ? (totalExposureValue / 100000).toFixed(1) + "L" : "24.6L";
@@ -80,7 +121,14 @@ export default function DashboardPanel({
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display" style={{ color: theme.primary }}>{activeMattersCount}</h3>
-            <span className="text-[11px] text-slate-400 block mt-1">↑ 3 initialized this month</span>
+            <div className="flex flex-col gap-0.5 mt-1">
+              <span className="text-[11px] text-slate-400 block">↑ 3 initialized this month</span>
+              {stagnantCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[9.5px] font-black text-amber-700 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest mt-1 animate-pulse w-max">
+                  <AlertTriangle className="w-3 h-3" /> {stagnantCount} Stagnant Files
+                </span>
+              )}
+            </div>
             <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
           </div>
         </div>
@@ -222,35 +270,64 @@ export default function DashboardPanel({
         {/* Recent activities widget */}
         <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs">
           <h3 className="text-sm font-bold font-display text-slate-900 mb-4 uppercase tracking-wide text-xs">Recent Activity Stream</h3>
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">RS</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-850 font-medium font-sans">Contract amended — Bally Jute Supply Agreement</p>
-                <span className="text-[10px] text-slate-400 font-sans">Rajan Sharma · 2 hours ago</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0">PM</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-850 font-medium font-sans">New litigation registered — Labour Tribunal West Bengal</p>
-                <span className="text-[10px] text-slate-400 font-sans">P. Mukherjee · Yesterday, 3:40 PM</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">AP</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-850 font-medium font-sans">Patent renewal reminder logs — Patent IN 312456</p>
-                <span className="text-[10px] text-slate-400 font-sans">A. Prasad · 2 days ago</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">SK</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-850 font-medium font-sans">Counsel invoice approved — ₹1,80,000 disbursement ledger</p>
-                <span className="text-[10px] text-slate-400 font-sans">S. Kumar · 3 days ago</span>
-              </div>
-            </div>
+          <div className="space-y-3.5">
+            {companyAuditLogs.length > 0 ? (
+              companyAuditLogs.map((log) => (
+                <div key={log.id} className="flex items-start gap-3 p-1.5 hover:bg-slate-50 rounded-lg transition">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 select-none ${getLogBadgeColors(log.action)}`}>
+                    {getInitials(log.userName)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-800 font-medium font-sans">
+                      <strong className="text-slate-900 font-semibold">{log.action}</strong> &mdash; {log.details}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1">
+                      <span className="font-semibold text-slate-600">{log.userName}</span>
+                      <span>&bull;</span>
+                      <span className="font-mono text-[9.5px] uppercase tracking-wider">{log.company}</span>
+                      <span>&bull;</span>
+                      <span className="font-medium">
+                        {new Date(log.timestamp).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short"
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">RS</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">Contract amended &mdash; Bally Jute Supply Agreement</p>
+                    <span className="text-[10px] text-slate-400 font-sans">Rajan Sharma &bull; Yajur &bull; 2 hours ago</span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0">PM</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">New litigation registered &mdash; Labour Tribunal West Bengal</p>
+                    <span className="text-[10px] text-slate-400 font-sans">P. Mukherjee &bull; Yashoda &bull; Yesterday, 3:40 PM</span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">AP</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">Patent renewal reminder logs &mdash; Patent IN 312456</p>
+                    <span className="text-[10px] text-slate-400 font-sans">A. Prasad &bull; Yajur &bull; 2 days ago</span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">SK</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">Counsel invoice approved &mdash; ₹1,80,000 disbursement ledger</p>
+                    <span className="text-[10px] text-slate-400 font-sans">S. Kumar &bull; Bally Jute &bull; 3 days ago</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

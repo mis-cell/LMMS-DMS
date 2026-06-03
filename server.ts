@@ -418,7 +418,14 @@ app.put("/api/matters/:id", async (req: Request, res: Response) => {
   const { status, title, department, opponentParty, externalCounsel, courtOrAuthority, nextHearingDate, description, value } = req.body;
 
   const updates: Partial<Matter> = {};
-  if (status !== undefined) { matter.status = status; updates.status = status; }
+  if (status !== undefined) { 
+    matter.status = status; 
+    updates.status = status; 
+    if (status !== oldStatus) {
+      matter.lastUpdatedOn = new Date().toISOString().split("T")[0];
+      updates.lastUpdatedOn = matter.lastUpdatedOn;
+    }
+  }
   if (title !== undefined) { matter.title = title; updates.title = title; }
   if (department !== undefined) { matter.department = department; updates.department = department; }
   if (opponentParty !== undefined) { matter.opponentParty = opponentParty; updates.opponentParty = opponentParty; }
@@ -666,6 +673,76 @@ The active auditor roles and regional legal heads have verified that the file co
   res.setHeader("Content-Disposition", `attachment; filename="${filenameClean.replace(/\.[^/.]+$/, "")}_LRLMS_Synced.txt"`);
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.send(fileContent);
+});
+
+// PATCH edit/update document details with automatic DMS version logs tracking
+app.patch("/api/documents/:id", async (req: Request, res: Response) => {
+  const user = getUserContext(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const { id } = req.params;
+  const docIdx = db.documents.findIndex(d => d.id === id);
+  if (docIdx === -1) {
+    return res.status(404).json({ error: "Document not found" });
+  }
+
+  const originalDoc = db.documents[docIdx];
+
+  // Ensure security isolation
+  if (user.role !== "Super Admin" && originalDoc.company !== user.company) {
+    return res.status(403).json({ error: "Access Denied: Security isolation breach." });
+  }
+
+  const body = req.body;
+  const originalVersions = originalDoc.versions || [
+    {
+      version: originalDoc.version - 1 > 0 ? originalDoc.version - 1 : 1,
+      uploadedBy: originalDoc.uploadedBy,
+      uploadedOn: originalDoc.uploadedOn,
+      fileName: originalDoc.fileName,
+      changes: "Initial baseline DMS ingestion"
+    }
+  ];
+
+  const newVersionNum = originalDoc.version + 1;
+  const changedFields: string[] = [];
+  if (body.fileName && body.fileName !== originalDoc.fileName) changedFields.push(`File renamed to "${body.fileName}"`);
+  if (body.category && body.category !== originalDoc.category) changedFields.push(`Category updated to "${body.category}"`);
+  if (body.riskLevel && body.riskLevel !== originalDoc.riskLevel) changedFields.push(`Risk set to "${body.riskLevel}"`);
+  if (body.parties && JSON.stringify(body.parties) !== JSON.stringify(originalDoc.parties)) changedFields.push(`Parties revised`);
+  if (body.expiryDate !== undefined && body.expiryDate !== originalDoc.expiryDate) changedFields.push(`Expiry date shifted`);
+  
+  const changeMessage = changedFields.join("; ") || "General metadata fields amended";
+
+  const newVerLog = {
+    version: newVersionNum,
+    uploadedBy: user.name,
+    uploadedOn: new Date().toISOString(),
+    fileName: body.fileName || originalDoc.fileName,
+    changes: changeMessage
+  };
+
+  const updatedVersions = [...originalVersions, newVerLog];
+  const updatedDoc = {
+    ...originalDoc,
+    ...body,
+    version: newVersionNum,
+    versions: updatedVersions
+  };
+
+  db.documents[docIdx] = updatedDoc as any;
+  writeDatabase(db);
+
+  await addAuditLog(
+    user.id,
+    user.name,
+    user.role,
+    originalDoc.company,
+    "Document Edited",
+    `Updated compliance document: "${originalDoc.fileName}" to version ${newVersionNum}.`
+  );
+
+  res.json(updatedDoc);
 });
 
 // Create Notice

@@ -1,4 +1,4 @@
-import { User, Matter, LegalDocument, LegalNotice, Hearing, AuditLog } from "../types";
+import { User, Matter, LegalDocument, LegalNotice, Hearing, AuditLog, DocumentVersion } from "../types";
 
 // Static defaults matching data/database.json for fallback/offline/static mode
 const INITIAL_USERS: User[] = [
@@ -735,6 +735,15 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
 
       if (updates.value !== undefined) updatedMatter.value = Number(updates.value);
 
+      let auditAction = "Matter Updated";
+      let auditDetails = `Matter ${id} updated template info.`;
+      if (updates.status && updates.status !== original.status) {
+        auditAction = "Legal Stage Transition";
+        auditDetails = `Matter ${id} transitioned status from '${original.status}' to '${updates.status}'.`;
+        updatedMatter.lastUpdatedOn = new Date().toISOString().split("T")[0];
+        updates.lastUpdatedOn = updatedMatter.lastUpdatedOn;
+      }
+
       db.matters[matterIndex] = updatedMatter;
       clientState.save(db);
 
@@ -747,13 +756,6 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
           });
         }
       } catch {}
-
-      let auditAction = "Matter Updated";
-      let auditDetails = `Matter ${id} updated template info.`;
-      if (updates.status && updates.status !== original.status) {
-        auditAction = "Legal Stage Transition";
-        auditDetails = `Matter ${id} transitioned status from '${original.status}' to '${updates.status}'.`;
-      }
 
       await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, original.company, auditAction, auditDetails);
       return new Response(JSON.stringify(updatedMatter), { status: 200 });
@@ -894,18 +896,62 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
     }
     
     const originalDoc = db.documents[docIdx];
-    const updatedDoc = { ...originalDoc, ...body };
+    
+    // Construct versions history list
+    const originalVersions: DocumentVersion[] = originalDoc.versions || [
+      {
+        version: originalDoc.version - 1 > 0 ? originalDoc.version - 1 : 1,
+        uploadedBy: originalDoc.uploadedBy,
+        uploadedOn: originalDoc.uploadedOn,
+        fileName: originalDoc.fileName,
+        changes: "Initial baseline DMS ingestion"
+      }
+    ];
+
+    const newVersionNum = originalDoc.version + 1;
+    const changedFields: string[] = [];
+    if (body.fileName && body.fileName !== originalDoc.fileName) changedFields.push(`File renamed to "${body.fileName}"`);
+    if (body.category && body.category !== originalDoc.category) changedFields.push(`Category updated to "${body.category}"`);
+    if (body.riskLevel && body.riskLevel !== originalDoc.riskLevel) changedFields.push(`Risk set to "${body.riskLevel}"`);
+    if (body.parties && JSON.stringify(body.parties) !== JSON.stringify(originalDoc.parties)) changedFields.push(`Parties revised`);
+    if (body.expiryDate !== undefined && body.expiryDate !== originalDoc.expiryDate) changedFields.push(`Expiry date shifted`);
+    
+    const changeMessage = changedFields.join("; ") || "General metadata fields amended";
+
+    const newVerLog: DocumentVersion = {
+      version: newVersionNum,
+      uploadedBy: activeUser.name,
+      uploadedOn: new Date().toISOString(),
+      fileName: body.fileName || originalDoc.fileName,
+      changes: changeMessage
+    };
+
+    const updatedVersions = [...originalVersions, newVerLog];
+    const updatedDoc: LegalDocument = { 
+      ...originalDoc, 
+      ...body, 
+      version: newVersionNum,
+      versions: updatedVersions
+    };
+
     db.documents[docIdx] = updatedDoc;
     clientState.save(db);
     
     try {
       const probe = await probeSupabaseConnection();
       if (probe.tables.lrlms_documents) {
-        await directSupabaseRequest(`lrlms_documents?id=eq.${docId}`, { method: "PATCH", body: JSON.stringify(body) });
+        await directSupabaseRequest(`lrlms_documents?id=eq.${docId}`, { 
+          method: "PATCH", 
+          body: JSON.stringify({
+            ...body,
+            version: newVersionNum,
+            versions: updatedVersions
+          }) 
+        });
       }
     } catch {}
     
-    await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, originalDoc.company, "Document Edited", `Updated details of compliance document: "${originalDoc.fileName}".`);
+    await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, originalDoc.company, "Document Edited", `Updated details of compliance document: "${originalDoc.fileName}" to version ${newVersionNum}.`);
     return new Response(JSON.stringify(updatedDoc), { status: 200 });
   }
 

@@ -38,6 +38,7 @@ export interface Matter {
   value: number; // Legal exposure or contract value in INR
   createdOn: string;
   createdBy: string;
+  lastUpdatedOn?: string; // Track status updates for stagnancy
 }
 
 export type DocCategory = 
@@ -51,6 +52,14 @@ export type DocCategory =
   | "Certificates" 
   | "Intellectual Property Records" 
   | "Internal Legal Opinions";
+
+export interface DocumentVersion {
+  version: number;
+  uploadedBy: string;
+  uploadedOn: string;
+  fileName: string;
+  changes?: string;
+}
 
 export interface LegalDocument {
   id: string;
@@ -68,6 +77,7 @@ export interface LegalDocument {
   parties: string[]; // Extracted via AI
   expiryDate: string | null; // For contracts
   textContent?: string; // Optional full transcript or legal text content
+  versions?: DocumentVersion[]; // DMS traceability version history list
 }
 
 export type NoticeType = "Incoming" | "Outgoing";
