@@ -36,7 +36,8 @@ import {
   CalendarCheck,
   FileText,
   ShieldAlert,
-  AlertTriangle
+  AlertTriangle,
+  Mail
 } from "lucide-react";
 
 import { User, Matter, LegalDocument, LegalNotice, Hearing, AuditLog, CompanyType, MatterType, MatterStatus } from "./types";
@@ -129,6 +130,13 @@ export default function App() {
   const [selectedDocForPreview, setSelectedDocForPreview] = useState<LegalDocument | null>(null);
   const [cronAlerts, setCronAlerts] = useState<any[]>([]);
   const [silencedAlertIds, setSilencedAlertIds] = useState<Set<string>>(new Set());
+
+  // Secure Document Share via Email States
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [emailPermission, setEmailPermission] = useState("Read Only Secure Sandboxed Link");
+  const [emailPurpose, setEmailPurpose] = useState("Statutory Audit Inquiry");
+  const [emailSendingState, setEmailSendingState] = useState<"idle" | "verifying" | "encrypting" | "sent">("idle");
+  const [emailSuccessMessage, setEmailSuccessMessage] = useState("");
 
   // Form Modals State
   const [showNewMatterModal, setShowNewMatterModal] = useState(false);
@@ -703,6 +711,35 @@ export default function App() {
       })
     });
     setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleDocEmailShareAction = async (docId: string, recipient: string, permission: string, purpose: string) => {
+    if (!recipient) return;
+    
+    setEmailSendingState("verifying");
+    setEmailSuccessMessage("");
+
+    setTimeout(async () => {
+      setEmailSendingState("encrypting");
+      
+      setTimeout(async () => {
+        // Create audit log in database
+        await handleClientSideFallback("/api/audit-logs", {
+          method: "POST",
+          headers: { "x-user-id": activeUser?.id },
+          body: JSON.stringify({
+            action: "Document Shared",
+            company: selectedDocForPreview?.company || "Group",
+            details: `Secure legal docket email dispatched. Recipient: [${recipient}], Clearance: [${permission}], Purpose: [${purpose}], File: "${selectedDocForPreview?.fileName}".`
+          })
+        });
+
+        setEmailSendingState("sent");
+        setEmailSuccessMessage(`✓ Secure email dispatch simulation completed! Link token holding '${permission}' with tracking hash successfully logged under NDA compliance.`);
+        setEmailRecipient("");
+        setRefreshTrigger(prev => prev + 1);
+      }, 900);
+    }, 700);
   };
 
   const handleAlertClick = (alertObj: any) => {
@@ -2394,6 +2431,101 @@ export default function App() {
                         "Permanent legal filing. Excluded from automated quarterly system cleanup cycles." : 
                         `Scheduled for regulatory deletion on year ${2026 + (selectedDocForPreview.retentionPolicyYrs || 7)}.`}
                     </div>
+                  </div>
+                </div>
+
+                {/* Secure Document Share via Email Dispatcher */}
+                <div className="border-t border-slate-900 pt-3">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-slate-500 text-[9px] uppercase font-bold">Secure Email Dispatch</span>
+                    <span className="text-[8px] font-mono text-emerald-400 select-none flex items-center gap-0.5">● Active Gateway</span>
+                  </div>
+                  
+                  <div className="bg-slate-900 border border-slate-900/50 p-2.5 rounded-lg space-y-2">
+                    {emailSuccessMessage ? (
+                      <div className="space-y-2">
+                        <div className="bg-emerald-950/30 border border-emerald-900/50 p-2 rounded text-emerald-400 text-[9.5px] leading-normal font-sans">
+                          {emailSuccessMessage}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEmailSuccessMessage("")}
+                          className="w-full py-1 bg-slate-800 hover:bg-slate-750 text-slate-350 text-[9px] font-bold rounded cursor-pointer transition select-none tracking-wide"
+                        >
+                          Send Another Email Dispatch
+                        </button>
+                      </div>
+                    ) : (
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleDocEmailShareAction(selectedDocForPreview.id, emailRecipient, emailPermission, emailPurpose);
+                        }}
+                        className="space-y-2"
+                      >
+                        <div>
+                          <label className="text-[8.5px] text-slate-400 block font-bold uppercase mb-1">Recipient Email Address</label>
+                          <input 
+                            required
+                            type="email"
+                            value={emailRecipient}
+                            onChange={(e) => setEmailRecipient(e.target.value)}
+                            placeholder="e.g., general.counsel@yajur.com"
+                            className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 outline-none text-[10px] p-1.5 rounded text-slate-200 font-sans"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[8.5px] text-slate-400 block font-bold uppercase mb-1">Clearance Action Token</label>
+                          <select 
+                            value={emailPermission}
+                            onChange={(e) => setEmailPermission(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 outline-none text-[10px] p-1.5 rounded text-slate-200 cursor-pointer"
+                          >
+                            <option value="Read Only Secure Sandboxed Link">Read Only Sandboxed Link</option>
+                            <option value="Encrypted NDA PDF Attachment">Encrypted NDA PDF Attachment</option>
+                            <option value="Revocable 24h Vault Access Token">Revocable 24h Vault Access Token</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[8.5px] text-slate-400 block font-bold uppercase mb-1">Authorized Audit Purpose</label>
+                          <select 
+                            value={emailPurpose}
+                            onChange={(e) => setEmailPurpose(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 outline-none text-[10px] p-1.5 rounded text-slate-200 cursor-pointer"
+                          >
+                            <option value="Statutory Audit Inquiry">Statutory Audit Inquiry</option>
+                            <option value="Direct Counter-party Service">Direct Counter-party Service</option>
+                            <option value="Board Committee Review">Board Committee Review</option>
+                            <option value="Regional Corporate Counsel Consultation">Corporate legal consult</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={emailSendingState === "verifying" || emailSendingState === "encrypting"}
+                          className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-950 disabled:opacity-85 text-white font-extrabold rounded text-[9.5px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer select-none transition"
+                        >
+                          {emailSendingState === "verifying" ? (
+                            <>
+                              <RefreshCw className="w-3 h-3 animate-spin text-indigo-400" />
+                              <span>Checking NDA clearances...</span>
+                            </>
+                          ) : emailSendingState === "encrypting" ? (
+                            <>
+                              <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
+                              <span>Hashing Docket Payload...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="w-3.5 h-3.5" />
+                              <span>Dispatch Secure Email Link</span>
+                            </>
+                          )}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 </div>
 

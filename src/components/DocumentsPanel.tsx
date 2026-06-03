@@ -19,7 +19,9 @@ import {
   Trash2,
   AlertTriangle,
   History,
-  Calendar
+  Calendar,
+  QrCode,
+  Cpu
 } from "lucide-react";
 import { LegalDocument, Matter, DocCategory } from "../types";
 import DocumentUploadModal from "./DocumentUploadModal";
@@ -74,6 +76,13 @@ export default function DocumentsPanel({
   const [editRiskLevel, setEditRiskLevel] = useState<"Low" | "Medium" | "High">("Low");
   const [editParties, setEditParties] = useState("");
   const [editExpiryDate, setEditExpiryDate] = useState("");
+  const [editTags, setEditTags] = useState("");
+  const [editOcrStatus, setEditOcrStatus] = useState<"Pending" | "Processing" | "Completed" | "Failed">("Completed");
+
+  // QR Label Scanner States
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
 
   // Zoho-inspired Contract Builder States
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState<number | null>(null);
@@ -100,17 +109,22 @@ export default function DocumentsPanel({
     setEditRiskLevel(doc.riskLevel || "Low");
     setEditParties(doc.parties?.join(", ") || "");
     setEditExpiryDate(doc.expiryDate || "");
+    setEditTags(doc.tags?.join(", ") || "");
+    setEditOcrStatus(doc.ocrStatus || "Completed");
   };
 
   const handleSaveEdit = async () => {
     if (!editingDoc || !onEdit) return;
     const partiesArr = editParties.split(",").map(p => p.trim()).filter(Boolean);
+    const tagsArr = editTags.split(",").map(t => t.trim()).filter(Boolean);
     await onEdit(editingDoc.id, {
       fileName: editFileName,
       category: editCategory as any,
       riskLevel: editRiskLevel,
       parties: partiesArr,
-      expiryDate: editExpiryDate || null
+      expiryDate: editExpiryDate || null,
+      tags: tagsArr,
+      ocrStatus: editOcrStatus
     });
     setEditingDoc(null);
   };
@@ -125,8 +139,15 @@ export default function DocumentsPanel({
   // Filter GDrive documents
   const compDocs = documents.filter(d => effectiveCompany === "Group" || d.company === effectiveCompany);
   const filteredDocs = compDocs.filter(d => {
-    const matchesSearch = d.fileName.toLowerCase().includes(dmsSearch.toLowerCase()) || d.category.toLowerCase().includes(dmsSearch.toLowerCase());
-    const matchesCategory = activeCategory === "All" || d.category.toLowerCase().includes(activeCategory.toLowerCase()) || d.fileName.toLowerCase().includes(activeCategory.toLowerCase());
+    const matchesSearch = 
+      d.fileName.toLowerCase().includes(dmsSearch.toLowerCase()) || 
+      d.category.toLowerCase().includes(dmsSearch.toLowerCase()) ||
+      (d.tags && d.tags.some(t => t.toLowerCase().includes(dmsSearch.toLowerCase())));
+    const matchesCategory = 
+      activeCategory === "All" || 
+      d.category.toLowerCase().includes(activeCategory.toLowerCase()) || 
+      d.fileName.toLowerCase().includes(activeCategory.toLowerCase()) ||
+      (d.tags && d.tags.some(t => t.toLowerCase().includes(activeCategory.toLowerCase())));
     return matchesSearch && matchesCategory;
   });
 
@@ -276,6 +297,18 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
             {/* Right side: Uploader trigger button */}
             <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
               <button
+                onClick={() => {
+                  setScannerStatus("");
+                  setIsScanning(false);
+                  setShowQrScanner(true);
+                }}
+                className="px-4 py-2 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 bg-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                title="Scan physical QR label printed on filing jacket to search instantly"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Scan QR Label</span>
+              </button>
+              <button
                 onClick={() => setShowUploadModal(true)}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                 title="Open modern Google Drive virtual document syncing scanner workspace"
@@ -383,10 +416,10 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
                 <div 
                   key={doc.id} 
                   onClick={() => onDocClick(doc)}
-                  className="bg-white border border-slate-100 rounded-xl p-4 shadow-3xs hover:border-indigo-400 hover:shadow-xs transition duration-200 flex flex-col justify-between h-48 relative cursor-pointer group"
+                  className="bg-white border border-slate-100 rounded-xl p-4 shadow-3xs hover:border-indigo-400 hover:shadow-xs transition duration-200 flex flex-col justify-between min-h-52 h-auto relative cursor-pointer group"
                 >
                   <div>
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start gap-1">
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox"
@@ -394,18 +427,51 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
                           onChange={() => handleToggleSelect(doc.id)}
                           className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
                         />
-                        <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><FileText className="w-5 h-5" /></span>
+                        <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 shrink-0"><FileText className="w-5 h-5" /></span>
                       </div>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        doc.riskLevel === "High" ? "bg-rose-50 text-rose-700" : doc.riskLevel === "Medium" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
-                      }`}>
-                        Risk level: {doc.riskLevel || "Low"}
-                      </span>
+                      <div className="flex flex-col items-end gap-1 select-none font-sans">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          doc.riskLevel === "High" ? "bg-rose-50 text-rose-700" : doc.riskLevel === "Medium" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                        }`}>
+                          Risk: {doc.riskLevel || "Low"}
+                        </span>
+                        {(() => {
+                          const ocr = doc.ocrStatus || "Completed";
+                          const colors = ocr === "Completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                                         ocr === "Processing" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 inline-flex items-center gap-1" :
+                                         ocr === "Pending" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                         "bg-rose-50 text-rose-700 border border-rose-100";
+                          return (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border font-sans select-none tracking-tight ${colors}`} title="OCR Full Text Indexing Status">
+                              {ocr === "Processing" && <RefreshCw className="w-2.5 h-2.5 animate-spin inline-block shrink-0" />}
+                              OCR: {ocr}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
                     <h4 className="text-xs font-bold text-slate-800 font-sans mt-3 truncate group-hover:text-indigo-600 transition-colors" title={doc.fileName}>{doc.fileName}</h4>
-                    <span className="text-[10.5px] block text-slate-400 mt-1">Classification: {doc.category}</span>
+                    <span className="text-[10.5px] block text-slate-400 mt-1 pb-1">Classification: {doc.category}</span>
+                    
+                    {/* Tags block */}
+                    {doc.tags && doc.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mt-1 pb-2" onClick={(e) => e.stopPropagation()}>
+                        {doc.tags.map(tag => (
+                          <span key={tag} className="px-1.5 py-0.5 bg-slate-50 border border-slate-150 border-slate-100 text-slate-500 rounded text-[9px] font-extrabold uppercase select-text font-sans">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1 mt-1 pb-2">
+                        <span className="px-1.5 py-0.5 bg-slate-50 text-slate-450 rounded text-[9px] italic select-none">
+                          No tags assigned
+                        </span>
+                      </div>
+                    )}
+
                     {doc.parties && doc.parties.length > 0 && (
-                      <span className="text-[9.5px] block text-slate-500 mt-1 truncate" title={doc.parties.join(", ")}>Parties: {doc.parties.join(", ")}</span>
+                      <span className="text-[9.5px] block text-slate-500 pb-2 mt-0.5 truncate border-t border-slate-50/50 pt-1.5" title={doc.parties.join(", ")}>Parties: {doc.parties.join(", ")}</span>
                     )}
                   </div>
                   
@@ -948,6 +1014,31 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="block font-bold text-slate-500 uppercase text-[9.5px] mb-1.5">Document Tags (Litigation or Department type, comma separated)</label>
+                <input
+                  type="text"
+                  value={editTags}
+                  onChange={e => setEditTags(e.target.value)}
+                  placeholder="e.g., HR, Litigation, Bally Jute, Corporate"
+                  className="w-full text-xs px-3 py-2 border rounded-lg focus:border-indigo-400 outline-none font-sans"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-500 uppercase text-[9.5px] mb-1.5">OCR Status Badge</label>
+                <select
+                  value={editOcrStatus}
+                  onChange={e => setEditOcrStatus(e.target.value as any)}
+                  className="w-full text-xs px-3 py-2 border rounded-lg focus:border-indigo-400 bg-white outline-none font-sans"
+                >
+                  <option value="Completed">Completed - OCR Searchable</option>
+                  <option value="Processing">Processing - Deep Parsing</option>
+                  <option value="Pending">Pending - In queue</option>
+                  <option value="Failed">Failed - Requires scan retry</option>
+                </select>
+              </div>
             </div>
 
             <div className="bg-slate-50 px-5 py-3 border-t flex justify-end gap-2 text-xs">
@@ -1115,6 +1206,155 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
                 className="px-4 py-2 bg-slate-900 font-semibold text-white hover:bg-slate-800 text-xs rounded-lg cursor-pointer transition select-none shadow-xs"
               >
                 Close Trace Console
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Physical Folder QR Code Laser Scanner Modal Overlay */}
+      {showQrScanner && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4 font-sans text-slate-800 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex justify-between items-center bg-slate-900 text-white px-5 py-4">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-4 h-4 text-indigo-400 animate-pulse" />
+                <div>
+                  <h3 className="font-bold text-sm uppercase tracking-wide">Secure Physical Jacket QR Scanner</h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Mock high-fidelity lens virtualization system</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowQrScanner(false);
+                  setIsScanning(false);
+                  setScannerStatus("");
+                }}
+                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-1.5 rounded-full cursor-pointer transition text-xs font-bold px-2.5"
+              >
+                &times; Close
+              </button>
+            </div>
+
+            {/* Viewfinder Grid */}
+            <div className="p-5 space-y-4">
+              <div className="relative">
+                {/* Viewfinder screen */}
+                <div className="w-full aspect-[4/3] max-w-sm mx-auto bg-slate-950 border border-slate-800 rounded-xl relative overflow-hidden flex flex-col items-center justify-center text-slate-300 shadow-inner">
+                  
+                  {/* Glowing camera lens laser sweep line */}
+                  <div className="absolute inset-x-0 h-0.5 bg-emerald-400 opacity-80 shadow-[0_0_8px_#34d399] animate-[bounce_3s_infinite]" />
+
+                  {/* Corner scanning brackets */}
+                  <div className="absolute top-4 left-4 w-5 h-5 border-t-2 border-l-2 border-emerald-400 rounded-tl-md"></div>
+                  <div className="absolute top-4 right-4 w-5 h-5 border-t-2 border-r-2 border-emerald-400 rounded-tr-md"></div>
+                  <div className="absolute bottom-4 left-4 w-5 h-5 border-b-2 border-l-2 border-emerald-400 rounded-bl-md"></div>
+                  <div className="absolute bottom-4 right-4 w-5 h-5 border-b-2 border-r-2 border-emerald-400 rounded-br-md"></div>
+
+                  {/* Scanning State Loader */}
+                  {isScanning ? (
+                    <div className="space-y-3.5 text-center px-6">
+                      <div className="relative w-12 h-12 mx-auto flex items-center justify-center">
+                        <Cpu className="w-8 h-8 text-emerald-400 animate-pulse shrink-0" />
+                        <div className="absolute inset-0 rounded-full border-2 border-dashed border-emerald-500 animate-[spin_4s_linear_infinite]" />
+                      </div>
+                      <div className="text-xs whitespace-pre-wrap select-none leading-relaxed font-mono text-emerald-400">
+                        {scannerStatus || "Aligning focus grids..."}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 text-center px-6">
+                      <div className="w-14 h-14 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center mx-auto text-emerald-400 animate-pulse">
+                        <QrCode className="w-7 h-7" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold tracking-tight uppercase text-slate-400">Camera Viewfinder Online</p>
+                        <p className="text-[10px] text-slate-500 mt-1 max-w-xs mx-auto leading-normal">
+                          Point your device camera at any physical document file folder QR label, or select from the pre-indexed filing catalog below to simulate a scan.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Mini Overlay Status Tag */}
+                  <div className="absolute bottom-3 right-3 text-[8.5px] font-mono text-slate-500 border border-slate-900 px-1.5 py-0.5 rounded bg-slate-900/50">
+                    FOCUS: AUTOFOCUS_HYBRID
+                  </div>
+                </div>
+              </div>
+
+              {/* Selector List of Catalog Files nearby */}
+              <div>
+                <span className="block font-bold text-slate-500 uppercase text-[9px] mb-2 select-none tracking-wider font-sans">
+                  Aligned Physical Folders Catalog ({compDocs.length} items nearby)
+                </span>
+                
+                <div className="max-h-52 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50 bg-slate-50/50 p-1 space-y-1">
+                  {compDocs.map((doc) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      disabled={isScanning}
+                      onClick={() => {
+                        setIsScanning(true);
+                        setScannerStatus("Aligning laser focus lens grids...");
+                        setTimeout(() => {
+                          setScannerStatus("Triggering safe high-power OCR scan...\nDecoding checksum standard hash...");
+                          setTimeout(() => {
+                            setScannerStatus(`Parsed correctly!\nID: ${doc.id}\nFilename: ${doc.fileName}`);
+                            setTimeout(() => {
+                              setShowQrScanner(false);
+                              setIsScanning(false);
+                              setScannerStatus("");
+                              onDocClick(doc);
+                            }, 500);
+                          }, 600);
+                        }, 500);
+                      }}
+                      className="w-full text-left p-2.5 bg-white border border-slate-100/80 hover:bg-indigo-50/40 hover:border-indigo-200 rounded-lg flex items-center justify-between text-xs transition duration-150 cursor-pointer group disabled:opacity-50"
+                    >
+                      <div className="truncate pr-4 flex-1">
+                        <div className="font-bold text-slate-800 text-[11.5px] truncate group-hover:text-indigo-600 transition-colors flex items-center gap-1.5 font-sans">
+                          <span className="shrink-0 p-1 bg-slate-50 rounded-md text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600"><FileText className="w-3.5 h-3.5" /></span>
+                          <span className="truncate">{doc.fileName}</span>
+                        </div>
+                        <div className="text-[9.5px] text-slate-400 mt-1 flex items-center gap-2 select-none font-sans">
+                          <span className="font-mono">ID: {doc.id}</span>
+                          <span>&bull;</span>
+                          <span>Dept/Type: {doc.category}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Custom visual Mock QR Code Thumbnail */}
+                        <div className="p-1 border border-slate-200 bg-slate-50 rounded-sm group-hover:border-indigo-200 transition-colors">
+                          <QrCode className="w-5 h-5 text-slate-700 group-hover:text-indigo-600" />
+                        </div>
+                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hidden sm:inline-block pl-1.5 group-hover:underline font-sans">
+                          Scan Focus &rarr;
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Simulated Instruction Footer */}
+            <div className="bg-slate-50 px-5 py-4 border-t flex items-center justify-between text-[11px] text-slate-400 font-sans leading-normal">
+              <span className="font-medium select-none pr-4">
+                The scanner simulates scanning physical folder jacket tags in real-time and automatically opens the matching digital document view trace.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQrScanner(false);
+                  setIsScanning(false);
+                  setScannerStatus("");
+                }}
+                className="px-4 py-2 border rounded-lg hover:bg-slate-100 font-semibold cursor-pointer text-slate-600 bg-white"
+              >
+                Close
               </button>
             </div>
           </div>

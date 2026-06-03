@@ -745,6 +745,21 @@ app.patch("/api/documents/:id", async (req: Request, res: Response) => {
   res.json(updatedDoc);
 });
 
+// Create Audit Log
+app.post("/api/audit-logs", async (req: Request, res: Response) => {
+  const user = getUserContext(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const { action, details, company } = req.body;
+  if (!action || !details) {
+    return res.status(400).json({ error: "Missing action or details" });
+  }
+
+  const logCompany = company || user.company;
+  await addAuditLog(user.id, user.name, user.role, logCompany, action, details);
+  res.json({ success: true });
+});
+
 // Create Notice
 app.post("/api/notices", async (req: Request, res: Response) => {
   const user = getUserContext(req);

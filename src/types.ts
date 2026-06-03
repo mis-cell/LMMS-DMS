@@ -86,6 +86,8 @@ export interface LegalDocument {
   esignStatus?: "Draft" | "Sent for Signature" | "Signed"; // Digital Signature requirement
   esignCompletedOn?: string;
   retentionPolicyYrs?: number; // Retention Policies requirement
+  tags?: string[]; // Custom labels/tags (e.g., department, litigation type)
+  ocrStatus?: "Pending" | "Processing" | "Completed" | "Failed"; // OCR process status for full-text search
 }
 
 export type NoticeType = "Incoming" | "Outgoing";
