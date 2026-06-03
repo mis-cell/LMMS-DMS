@@ -11,6 +11,7 @@ export interface ChatMessage {
 
 interface LegalAssistantChatProps {
   user: AuthUser;
+  effectiveCompany?: string;
 }
 
 const PRESET_PROMPTS = [
@@ -20,13 +21,15 @@ const PRESET_PROMPTS = [
   "Are there outstanding labour audit notices?"
 ];
 
-export default function LegalAssistantChat({ user }: LegalAssistantChatProps) {
+export default function LegalAssistantChat({ user, effectiveCompany }: LegalAssistantChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [typingState, setTypingState] = useState("");
   const [useSearchGrounding, setUseSearchGrounding] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const activeCo = effectiveCompany || (user.company === "Group" ? "Yajur" : user.company);
 
   useEffect(() => {
     // Initial friendly greeting
@@ -36,7 +39,7 @@ export default function LegalAssistantChat({ user }: LegalAssistantChatProps) {
         sender: "bot",
         text: `### Welcome, Counselor ${user.name} 
 
-I am your **LRLMS Legal Assistant**, powered by Gemini. I have read the active portfolios, Google Drive index records, and hearing calendar matching **${user.company}** credentials.
+I am your **LRLMS Legal Assistant**, powered by Gemini. I have read the active portfolios, Google Drive index records, and hearing calendar matching **${activeCo}** credentials.
 
 How can I assist you in your litigation risk management today?
 - *Ask about contract clauses and liabilities*
@@ -45,7 +48,7 @@ How can I assist you in your litigation risk management today?
         timestamp: new Date()
       }
     ]);
-  }, [user]);
+  }, [user, activeCo]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,7 +103,8 @@ How can I assist you in your litigation risk management today?
           body: JSON.stringify({
             message: textToSend,
             chatHistory: historyPayload,
-            useSearch: useSearchGrounding
+            useSearch: useSearchGrounding,
+            effectiveCompany: activeCo
           })
         });
 
@@ -113,7 +117,7 @@ How can I assist you in your litigation risk management today?
         }
       } catch (innerErr) {
         // High fidelity client-side response matcher for static GitHub Pages and offline modes
-        apiReply = getClientAISmartResponse(textToSend, user);
+        apiReply = getClientAISmartResponse(textToSend, user, activeCo);
       }
 
       clearInterval(statusInterval);
@@ -138,66 +142,84 @@ How can I assist you in your litigation risk management today?
   };
 
   // Static smart client-side conversational AI matcher
-  const getClientAISmartResponse = (prompt: string, currentUser: AuthUser): string => {
+  const getClientAISmartResponse = (prompt: string, currentUser: AuthUser, activeCo: string): string => {
     const q = prompt.toLowerCase();
     
     if (q.includes("jute") || q.includes("compare") || q.includes("dispute")) {
-      return `### Comparison of Jute Sourcing & Union Disputes
+      const items = [
+        `- **Bally Jute Mills (MAT-B-201)**: Arbitrating non-performance against *Bengal Jute Traders Co.* for advance raw sourcing contracts. Financial liability/Asset recovery target: **INR 85,00,000**. Legal Stage: *Hearing Scheduled for June 25, 2026*.`,
+        `- **Yajur Group (MAT-Y-101)**: Industrial conflict case over retro wage increments filed by the Employees Trade Union. Exposure: **INR 45,00,000**. Legal Stage: *Scheduled for oral arguments on June 15, 2026*.`
+      ];
+      const filtered = items.filter(item => activeCo === "Group" || item.includes(activeCo));
+      return `### Jute Sourcing & Union Disputes Assessment
   
-  Here is an assessment of active liabilities across the companies matching your profile:
+Here is an assessment of active liabilities for **${activeCo}** credentials:
   
-  - **Bally Jute Mills (MAT-B-201)**: Arbitrating non-performance against *Bengal Jute Traders Co.* for advance raw sourcing contracts. Financial liability/Asset recovery target: **INR 85,00,000**. Legal Stage: *Hearing Scheduled for June 25, 2026*.
-  - **Yajur Group (MAT-Y-101)**: Industrial conflict case over retro wage increments filed by the Employees Trade Union. Exposure: **INR 45,00,000**. Legal Stage: *Scheduled for oral arguments on June 15, 2026*.
+${filtered.length > 0 ? filtered.join("\n") : "No matching active jute or union conflicts registered."}
   
-  **Co-Counsel Assessment**: Real-time litigation value for Jute sourcing exceeds direct labor wage restructuring by 88%. Prioritize amicable arbitration settlements under IJMA guidelines to prevent further milling downtime.`;
+**Co-Counsel Assessment**: Prioritize amicable arbitration settlements under IJMA guidelines to prevent further milling downtime and secure trade operations.`;
     }
 
     if (q.includes("expiring") || q.includes("expiry") || q.includes("contract")) {
+      const items = [
+        `- **Raw Jute Sourcing Pact (DOC-B-002)**: Active supplier agreement with *Bengal Jute Traders Co.* is expiring on **June 20, 2026** (Bally Jute). Since litigation is ongoing on non-performance, early alternative suppliers must be vetted immediately to maintain raw fiber pipeline supply.`,
+        `- **Yajur Trade Union Sourcing Case (DOC-Y-001)**: Adjustment demands related to contract adjustments (Yajur). Periodic review required for retroactive wage provisions.`,
+        `- **Yashoda Sourcing Contract / Property deed (MAT-S-301)**: Regulatory compliance checks on Rajarhat site require clearance confirmation (Yashoda).`
+      ];
+      const filtered = items.filter(item => activeCo === "Group" || item.includes(activeCo));
       return `### Sourcing Commitments & Expiring Files
   
-  - **Raw Jute Sourcing Pact (DOC-B-002)**: Active supplier agreement with *Bengal Jute Traders Co.* is expiring on **June 20, 2026**. Since litigation is ongoing on non-performance, early alternative suppliers must be vetted immediately to maintain raw fiber pipeline supply.
-  - **Yajur Trade Union Sourcing Case (DOC-Y-001)**: Adjustment demands related to contract adjustments. Periodic review required for retroactive wage provisions.
-  - **Yashoda Sourcing Contract / Property deed (MAT-S-301)**: Regulatory compliance checks on Rajarhat site require clearance confirmation.
+Here are the contracts expiring soon for **${activeCo}**:
   
-  Let me know if you would like me to draft a notice template for supplier transition!`;
+${filtered.length > 0 ? filtered.join("\n") : "No matching expiring agreements found."}
+  
+Let me know if you would like me to draft a notice template for supplier transition!`;
     }
 
     if (q.includes("hearing") || q.includes("trial") || q.includes("date") || q.includes("calendar")) {
-      return `### Multi-Tenant Hearing Schedule
+      const items = [
+        `- **June 10, 2026**: *Bally Jute Mill ESI Appeal* (Employees' Insurance Court, Howrah)`,
+        `- **June 15, 2026**: *Trade Union wage revision arguments* (State Industrial Tribunal, Kolkata) matching Yajur`,
+        `- **June 25, 2026**: *Raw Jute Sourcing Agreement arbitration cross-examination* (IJMA Building) matching Bally Jute`,
+        `- **June 30, 2026**: *Yashoda Brands IP mock-imitation injunction suit* (Calcutta High Court)`
+      ];
+      const filtered = items.filter(item => activeCo === "Group" || item.includes(activeCo));
+      return `### Hearing Schedule & Docket Roster
   
-  The upcoming docket roster shows the following schedules matching **${currentUser.company}** credentials:
+The upcoming hearing timeline for **${activeCo}**:
   
-  - **June 10, 2026**: *Bally Jute Mill ESI Appeal* (Employees' Insurance Court, Howrah)
-  - **June 15, 2026**: *Trade Union wage revision arguments* (State Industrial Tribunal, Kolkata)
-  - **June 25, 2026**: *Raw Jute Sourcing Agreement arbitration cross-examination* (IJMA Building)
-  - **June 30, 2026**: *Yashoda Brands IP mock-imitation injunction suit* (Calcutta High Court)
+${filtered.length > 0 ? filtered.join("\n") : "No upcoming court trial hearings registered."}
   
-  *Task Assignment:* Ensure local counsels for the corresponding companies carry physical registers and verified receipts of contribution.`;
+*Task Assignment:* Ensure local counsels for the corresponding companies carry physical registers and verified receipts of contribution.`;
     }
 
     if (q.includes("notice") || q.includes("labour") || q.includes("pf") || q.includes("compliance")) {
+      const items = [
+        `1. **Yajur (NTC-Y-01 - Labour)**: Received from *Deputy Labour Commissioner, WB* demanding certified standing orders. Deadline: **June 12, 2026**.`,
+        `2. **Bally Jute (NTC-B-02 - Provident Fund)**: Regional Provident Fund Commissioner (Howrah) PF contribution mismatch claims. Deadline: **June 25, 2026**.`,
+        `3. **Yashoda Group (NTC-S-03 - intellectual Property)**: Cease and desist notice sent to *Yashoda Organic Aggregates*. Deadline expired. High Court injunction suit currently filed.`
+      ];
+      const filtered = items.filter(item => activeCo === "Group" || item.includes(activeCo));
       return `### Active Statutory Audits & Notices
   
-  A scanning of legal notices registers identified the following pending files:
+Active compliance alerts matching **${activeCo}** credentials:
   
-  1. **Yajur (NTC-Y-01 - Labour)**: Received from *Deputy Labour Commissioner, WB* demanding certified standing orders. Deadline: **June 12, 2026**.
-  2. **Bally Jute (NTC-B-02 - Provident Fund)**: Regional Provident Fund Commissioner (Howrah) PF contribution mismatch claims. Deadline: **June 25, 2026**.
-  3. **Yashoda Group (NTC-S-03 - intellectual Property)**: Cease and desist notice sent to *Yashoda Organic Aggregates*. Deadline expired. High Court injunction suit currently filed.
+${filtered.length > 0 ? filtered.join("\n") : "No pending outstanding statutory notices found."}
   
-  *Urgent recommendation:* Draft a compliance cover letter response for Yajur (**NTC-Y-01**) prior to the June 12th deadline.`;
+*Urgent recommendation:* Draft and prepare formal reply dossiers under appropriate division context.`;
     }
 
-    return `### LRLMS AI Insight Hub (Client-Side Mode)
+    return `### LRLMS AI Insight Hub
   
-  Hello counselor, I can analyze the full legal status for **${currentUser.company === "Group" ? "Yajur, Bally Jute and Yashoda" : currentUser.company}** portfolios.
+Hello counselor, I can analyze the full legal status for **${activeCo}** portfolios.
   
-  You can ask me questions about:
-  1. *Multi-tenant company dispute comparisons* (e.g., "compare disputes in bally and yajur")
-  2. *Upcoming court hearings* (e.g., "show upcoming hearing dates")
-  3. *Unresolved compliance notices* (e.g., "outline active labour notices")
-  4. *Active agreements or contract liabilities* (e.g., "which contracts have high risk?")
+You can ask me questions about:
+1. *Multi-tenant company dispute comparisons* (e.g., "compare disputes")
+2. *Upcoming court hearings* (e.g., "show upcoming hearing dates")
+3. *Unresolved compliance notices* (e.g., "outline active notices")
+4. *Active agreements or contract liabilities* (e.g., "which contracts have high risk?")
   
-  How can I support your legal preparation files today?`;
+How can I support your legal preparation files today?`;
   };
 
   // Convert simple markdown-like text to nice HTML on the fly or render gracefully
@@ -253,7 +275,7 @@ How can I assist you in your litigation risk management today?
               Gemini Legal Co-Counsel
             </h3>
             <span className="text-[10px] text-indigo-200 block font-mono">
-              Active clearance tenant isolation: {user.company === "Group" ? "All Conglomerates (Super Access)" : user.company}
+              Active clearance tenant isolation: {activeCo}
             </span>
           </div>
         </div>

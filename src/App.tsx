@@ -1180,7 +1180,7 @@ export default function App() {
           )}
 
           {activeTab === "ai" && activeUser && (
-            <LegalAssistantChat user={activeUser} />
+            <LegalAssistantChat user={activeUser} effectiveCompany={effectiveCompany} />
           )}
 
           {["reports", "audit"].includes(activeTab) && (
@@ -2203,9 +2203,9 @@ export default function App() {
       )}
 
       {/* CRON MONITOR SERVICE ALERT ALARM FLOATING STACK */}
-      {cronAlerts.length > 0 && (
+      {cronAlerts.filter(alert => effectiveCompany === "Group" || alert.company === effectiveCompany).length > 0 && (
         <div className="fixed bottom-5 right-5 z-45 space-y-3.5 w-96 font-sans max-h-[400px] overflow-y-auto">
-          {cronAlerts.map((alert) => {
+          {cronAlerts.filter(alert => effectiveCompany === "Group" || alert.company === effectiveCompany).map((alert) => {
             const isStagnant = alert.type === "Matter Status Stagnant";
             return (
               <div 

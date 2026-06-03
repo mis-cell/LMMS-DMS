@@ -138,64 +138,72 @@ export default function MattersPanel({
       </div>
 
       {/* Compliance Special Template View */}
-      {tab === "compliance" ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="bg-white border rounded-xl p-4 shadow-3xs">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Total Obligations</span>
-              <p className="text-xl font-bold text-slate-800 mt-2">7 Audits</p>
-            </div>
-            <div className="bg-white border rounded-xl p-4 shadow-3xs">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Filed this month</span>
-              <p className="text-xl font-bold text-emerald-600 mt-2">24 filings</p>
-            </div>
-            <div className="bg-white border rounded-xl p-4 shadow-3xs">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Overdue Alerts</span>
-              <p className="text-xl font-bold text-rose-600 mt-2">1 Pending Action</p>
-            </div>
-            <div className="bg-white border rounded-xl p-4 shadow-3xs">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Clearance Score</span>
-              <p className="text-xl font-bold text-indigo-600 mt-2">87% ratio</p>
-            </div>
-          </div>
+      {tab === "compliance" ? (() => {
+        const companyNotices = notices.filter(n => effectiveCompany === "Group" || n.company === effectiveCompany);
+        const totalObligations = companyNotices.length;
+        const overdueAlerts = companyNotices.filter(n => n.status === "Pending Action").length;
+        const filedThisMonth = companyNotices.filter(n => n.status === "Responded" || n.status === "Resolved").length;
+        const clearanceScore = totalObligations > 0 ? Math.round(((totalObligations - overdueAlerts) / totalObligations) * 100) : 100;
 
-          <div className="bg-white border border-slate-100 rounded-xl overflow-x-auto shadow-xs">
-            <table className="w-full min-w-[700px] text-xs font-sans text-slate-700">
-              <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
-                <tr className="text-left">
-                  <th className="p-3.5 uppercase text-[10px] tracking-wider pl-5">Compliance Obligation</th>
-                  <th className="p-3.5 uppercase text-[10px] tracking-wider">Act / Regulation Context</th>
-                  <th className="p-3.5 uppercase text-[10px] tracking-wider">Frequency</th>
-                  <th className="p-3.5 uppercase text-[10px] tracking-wider">Due date</th>
-                  <th className="p-3.5 uppercase text-[10px] tracking-wider">Responsible personnel</th>
-                  <th className="p-3.5 uppercase text-[10px] tracking-wider pr-5 text-right">Status Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {notices.map(ntc => (
-                  <tr key={ntc.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 pl-5 font-semibold text-slate-800 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ntc.company === "Yajur" ? "#185FA5" : ntc.company === "Bally Jute" ? "#854F0B" : "#3B6D11" }} />
-                      {ntc.senderOrRecipient}
-                    </td>
-                    <td className="p-4">{ntc.subType} Regulator Guidelines</td>
-                    <td className="p-4 font-mono text-xs">Monthly Ledger</td>
-                    <td className="p-4 font-semibold text-rose-650 text-rose-600">{ntc.deadlineDate || "15 Jun 2026"}</td>
-                    <td className="p-4 text-slate-500 font-medium">{ntc.legalTeamLead}</td>
-                    <td className="p-4 pr-5 text-right">
-                      <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${
-                        ntc.status === "Pending Action" ? "bg-rose-50 text-rose-700 border border-rose-150" : "bg-emerald-50 text-emerald-700 border border-emerald-150"
-                      }`}>
-                        {ntc.status}
-                      </span>
-                    </td>
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="bg-white border rounded-xl p-4 shadow-3xs">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Total Obligations</span>
+                <p className="text-xl font-bold text-slate-800 mt-2">{totalObligations} Audits</p>
+              </div>
+              <div className="bg-white border rounded-xl p-4 shadow-3xs">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Filed this month</span>
+                <p className="text-xl font-bold text-emerald-600 mt-2">{filedThisMonth} filings</p>
+              </div>
+              <div className="bg-white border rounded-xl p-4 shadow-3xs">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Overdue Alerts</span>
+                <p className="text-xl font-bold text-rose-600 mt-2">{overdueAlerts} Pending Action</p>
+              </div>
+              <div className="bg-white border rounded-xl p-4 shadow-3xs">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Clearance Score</span>
+                <p className="text-xl font-bold text-indigo-600 mt-2">{clearanceScore}% ratio</p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-100 rounded-xl overflow-x-auto shadow-xs">
+              <table className="w-full min-w-[700px] text-xs font-sans text-slate-700">
+                <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
+                  <tr className="text-left">
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider pl-5">Compliance Obligation</th>
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider">Act / Regulation Context</th>
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider">Frequency</th>
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider">Due date</th>
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider">Responsible personnel</th>
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider pr-5 text-right">Status Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {companyNotices.map(ntc => (
+                    <tr key={ntc.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 pl-5 font-semibold text-slate-800 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ntc.company === "Yajur" ? "#185FA5" : ntc.company === "Bally Jute" ? "#854F0B" : "#3B6D11" }} />
+                        {ntc.senderOrRecipient}
+                      </td>
+                      <td className="p-4">{ntc.subType} Regulator Guidelines</td>
+                      <td className="p-4 font-mono text-xs">Monthly Ledger</td>
+                      <td className="p-4 font-semibold text-rose-650 text-rose-600">{ntc.deadlineDate || "15 Jun 2026"}</td>
+                      <td className="p-4 text-slate-500 font-medium">{ntc.legalTeamLead}</td>
+                      <td className="p-4 pr-5 text-right">
+                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${
+                          ntc.status === "Pending Action" ? "bg-rose-50 text-rose-700 border border-rose-150" : "bg-emerald-50 text-emerald-700 border border-emerald-150"
+                        }`}>
+                          {ntc.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : (
+        );
+      })() : (
         <div className="space-y-6">
           {/* Filters Bar */}
           <div className="bg-white border border-slate-100 p-4 rounded-xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">

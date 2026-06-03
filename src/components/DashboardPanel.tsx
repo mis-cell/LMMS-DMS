@@ -444,38 +444,30 @@ export default function DashboardPanel({
                   </div>
                 </div>
               ))
-            ) : (
-              <>
-                <div onClick={() => onTabChange("dms")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">RS</div>
+            ) : (() => {
+              const fallbackLogs = [
+                { tab: "dms", initials: "RS", color: "bg-blue-50 text-blue-600", title: "Contract amended — Bally Jute Supply Agreement", sub: "Rajan Sharma • Yajur • 2 hours ago", company: "Yajur" },
+                { tab: "matters", initials: "PM", color: "bg-emerald-50 text-emerald-600", title: "New litigation registered — Labour Tribunal West Bengal", sub: "P. Mukherjee • Yashoda • Yesterday, 3:40 PM", company: "Yashoda" },
+                { tab: "matters", initials: "AP", color: "bg-indigo-50 text-indigo-605 text-indigo-600", title: "Patent renewal reminder logs — Patent IN 312456", sub: "A. Prasad • Yajur • 2 days ago", company: "Yajur" },
+                { tab: "invoices", initials: "SK", color: "bg-amber-50 text-amber-600", title: "Counsel invoice approved — ₹1,80,000 disbursement ledger", sub: "S. Kumar • Bally Jute • 3 days ago", company: "Bally Jute" }
+              ].filter(item => effectiveCompany === "Group" || item.company === effectiveCompany);
+
+              if (fallbackLogs.length === 0) {
+                return (
+                  <div className="py-4 text-center text-xs text-slate-400 italic">No recent activities for {effectiveCompany}</div>
+                );
+              }
+
+              return fallbackLogs.map((log, idx) => (
+                <div key={idx} onClick={() => onTabChange(log.tab)} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
+                  <div className={`w-8 h-8 rounded-full ${log.color} flex items-center justify-center font-bold text-xs shrink-0`}>{log.initials}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600">Contract amended &mdash; Bally Jute Supply Agreement</p>
-                    <span className="text-[10px] text-slate-400 font-sans">Rajan Sharma &bull; Yajur &bull; 2 hours ago</span>
+                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600">{log.title}</p>
+                    <span className="text-[10px] text-slate-400 font-sans">{log.sub}</span>
                   </div>
                 </div>
-                <div onClick={() => onTabChange("matters")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
-                  <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0">PM</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600">New litigation registered &mdash; Labour Tribunal West Bengal</p>
-                    <span className="text-[10px] text-slate-400 font-sans">P. Mukherjee &bull; Yashoda &bull; Yesterday, 3:40 PM</span>
-                  </div>
-                </div>
-                <div onClick={() => onTabChange("matters")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
-                  <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">AP</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600">Patent renewal reminder logs &mdash; Patent IN 312456</p>
-                    <span className="text-[10px] text-slate-400 font-sans">A. Prasad &bull; Yajur &bull; 2 days ago</span>
-                  </div>
-                </div>
-                <div onClick={() => onTabChange("invoices")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
-                  <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0SKSK">SK</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600 animate-pulse">Counsel invoice approved &mdash; ₹1,80,000 disbursement ledger</p>
-                    <span className="text-[10px] text-slate-400 font-sans">S. Kumar &bull; Bally Jute &bull; 3 days ago</span>
-                  </div>
-                </div>
-              </>
-            )}
+              ));
+            })()}
           </div>
         </div>
 
@@ -483,34 +475,104 @@ export default function DashboardPanel({
         <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs">
           <h3 className="text-sm font-bold font-display text-slate-900 mb-4 uppercase tracking-wide text-xs">Upcoming Hearings & Deadlines</h3>
           <div className="space-y-3.5">
-            <div 
-              onClick={() => onTabChange("calendar")}
-              className="border-l-4 border-rose-500 pl-3 cursor-pointer hover:bg-rose-50/40 p-2 rounded transition-all hover:translate-x-1"
-            >
-              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-600 transition-colors">Calcutta High Court — Written Objections filing</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">8 Days Remaining · <span className="font-semibold text-rose-600 bg-rose-50 px-1 rounded">Urgent</span></span>
-            </div>
-            <div 
-              onClick={() => onTabChange("compliance")}
-              className="border-l-4 border-amber-500 pl-3 cursor-pointer hover:bg-amber-50/40 p-2 rounded transition-all hover:translate-x-1"
-            >
-              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-600 transition-colors">ESI / PF Monthly Compulsory Audit Challan submission</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">13 Days Remaining · <span className="font-semibold text-amber-600 bg-amber-50 px-1 rounded">Pending</span></span>
-            </div>
-            <div 
-              onClick={() => onTabChange("property")}
-              className="border-l-4 border-indigo-500 pl-3 cursor-pointer hover:bg-indigo-50/40 p-2 rounded transition-all hover:translate-x-1 font-mono"
-            >
-              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-650 font-sans hover:text-indigo-600 transition-colors">Warehouse Lease Agreement Renewal Kolkata Node</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">18 Days Remaining · <span className="font-semibold text-indigo-600 bg-indigo-50 px-1 rounded">General</span></span>
-            </div>
-            <div 
-              onClick={() => onTabChange("ip")}
-              className="border-l-4 border-emerald-500 pl-3 cursor-pointer hover:bg-emerald-50/45 p-2 rounded transition-all hover:translate-x-1"
-            >
-              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-600 transition-colors">Patent Renewal IPO submission — Advanced Sourcing process</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">30 Days Remaining · <span className="font-semibold text-emerald-600 bg-emerald-50 px-1 rounded">IP Portfolio</span></span>
-            </div>
+            {(() => {
+              const deadlines: any[] = [];
+              
+              companyHearings.forEach(h => {
+                if (h.status === "Scheduled") {
+                  deadlines.push({
+                    title: `${h.court} — Hearing: ${h.matterTitle}`,
+                    subtitle: `Scheduled Court Hearing`,
+                    badge: "Hearing",
+                    badgeColor: "text-rose-600 bg-rose-50",
+                    borderColor: "border-rose-500",
+                    hoverBg: "hover:bg-rose-50/40",
+                    tab: "calendar"
+                  });
+                }
+              });
+
+              companyNotices.forEach(n => {
+                if (n.status === "Pending Action") {
+                  deadlines.push({
+                    title: `${n.subType} Notice compliance response pending — ${n.senderOrRecipient}`,
+                    subtitle: n.deadlineDate ? `Deadline: ${n.deadlineDate}` : "Action Required",
+                    badge: "Pending",
+                    badgeColor: "text-amber-600 bg-amber-50",
+                    borderColor: "border-amber-500",
+                    hoverBg: "hover:bg-amber-50/40",
+                    tab: "compliance"
+                  });
+                }
+              });
+
+              const fallbackDeadlines = [
+                {
+                  title: "Calcutta High Court — Written Objections filing",
+                  subtitle: "8 Days Remaining · Deadline: 11 Jun 2026",
+                  badge: "Urgent",
+                  badgeColor: "text-rose-600 bg-rose-50",
+                  borderColor: "border-rose-500",
+                  hoverBg: "hover:bg-rose-50/40",
+                  tab: "calendar",
+                  company: "Yajur"
+                },
+                {
+                  title: "ESI / PF Monthly Compulsory Audit Challan submission",
+                  subtitle: "13 Days Remaining · Deadline: 16 Jun 2026",
+                  badge: "Pending",
+                  badgeColor: "text-amber-600 bg-amber-50",
+                  borderColor: "border-amber-500",
+                  hoverBg: "hover:bg-amber-50/40",
+                  tab: "compliance",
+                  company: "Bally Jute"
+                },
+                {
+                  title: "Warehouse Lease Agreement Renewal Kolkata Node",
+                  subtitle: "18 Days Remaining · Deadline: 21 Jun 2026",
+                  badge: "General",
+                  badgeColor: "text-indigo-600 bg-indigo-50",
+                  borderColor: "border-indigo-500",
+                  hoverBg: "hover:bg-indigo-50/40",
+                  tab: "property",
+                  company: "Yashoda"
+                },
+                {
+                  title: "Patent Renewal IPO submission — Advanced Sourcing process",
+                  subtitle: "30 Days Remaining · Deadline: 03 Jul 2026",
+                  badge: "IP Portfolio",
+                  badgeColor: "text-emerald-600 bg-emerald-50",
+                  borderColor: "border-emerald-500",
+                  hoverBg: "hover:bg-emerald-50/45",
+                  tab: "ip",
+                  company: "Yajur"
+                }
+              ].filter(item => effectiveCompany === "Group" || item.company === effectiveCompany);
+
+              const itemsToRender = deadlines.length > 0 ? deadlines.slice(0, 4) : fallbackDeadlines;
+
+              if (itemsToRender.length === 0) {
+                return (
+                  <div className="py-6 text-center text-xs text-slate-400 italic">
+                    No upcoming deadlines found for {effectiveCompany === "Group" ? 'All Divisions' : effectiveCompany}.
+                  </div>
+                );
+              }
+
+              return itemsToRender.map((dl, idx) => (
+                <div 
+                  key={idx}
+                  onClick={() => onTabChange(dl.tab)}
+                  className={`border-l-4 ${dl.borderColor} pl-3 pr-2.5 cursor-pointer ${dl.hoverBg} py-2.5 rounded transition-all hover:translate-x-1`}
+                >
+                  <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-600 transition-colors">{dl.title}</h4>
+                  <div className="text-[10.5px] text-slate-500 mt-1 flex items-center justify-between">
+                    <span>{dl.subtitle}</span>
+                    <span className={`font-semibold px-1.5 py-0.2 rounded text-[9.5px] uppercase tracking-wider ${dl.badgeColor}`}>{dl.badge}</span>
+                  </div>
+                </div>
+              ));
+            })()}
           </div>
         </div>
       </div>
