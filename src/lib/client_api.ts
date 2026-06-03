@@ -781,7 +781,10 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
             body: JSON.stringify(updates)
           });
         }
-      } catch {}
+      } catch (err: any) {
+        console.error("Supabase Patch Error:", err);
+        return new Response(JSON.stringify({ error: `Database Save Failed (RLS Policy?): ${err.message}` }), { status: 500 });
+      }
 
       await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, original.company, auditAction, auditDetails);
       return new Response(JSON.stringify(updatedMatter), { status: 200 });
@@ -975,7 +978,10 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
           }) 
         });
       }
-    } catch {}
+    } catch (err: any) {
+        console.error("Supabase Patch Error:", err);
+        return new Response(JSON.stringify({ error: `Database Save Failed (RLS Policy?): ${err.message}` }), { status: 500 });
+    }
     
     await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, originalDoc.company, "Document Edited", `Updated details of compliance document: "${originalDoc.fileName}" to version ${newVersionNum}.`);
     return new Response(JSON.stringify(updatedDoc), { status: 200 });
@@ -1055,7 +1061,10 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
             body: JSON.stringify(updates)
           });
         }
-      } catch {}
+      } catch (err: any) {
+        console.error("Supabase Patch Error:", err);
+        return new Response(JSON.stringify({ error: `Database Save Failed (RLS Policy?): ${err.message}` }), { status: 500 });
+      }
 
       await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, original.company, "Notice Updated", `Notice (${id}) state changed. Status updated to ${updates.status || original.status}.`);
       return new Response(JSON.stringify(updatedNotice), { status: 200 });
