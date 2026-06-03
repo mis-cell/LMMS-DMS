@@ -115,20 +115,21 @@ export default function MattersPanel({
           </p>
         </div>
 
-        {tab !== "compliance" && ["Super Admin", "Company Admin", "Legal Head"].includes(activeUser?.role || "") && (
+        {["Super Admin", "Company Admin", "Legal Head"].includes(activeUser?.role || "") && (
           <button
-            onClick={onInstantiateMatterClick}
+            onClick={tab === "compliance" ? onLogNoticeClick : onInstantiateMatterClick}
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span>
+              {tab === "compliance" && "Log Notice / Compliance Alert"}
               {tab === "litigation" && "File New Case"}
               {tab === "contracts" && "Log Agreement"}
               {tab === "ip" && "Register IP"}
               {tab === "property" && "Add Property"}
               {tab === "tax" && "Add Tax Demand"}
               {tab === "matters" && "Instantiate New Matter"}
-              {["employment", "compliance"].includes(tab) && "Log Matter"}
+              {["employment"].includes(tab) && "Log Labor Matter"}
             </span>
           </button>
         )}

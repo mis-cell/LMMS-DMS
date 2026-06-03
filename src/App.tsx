@@ -129,9 +129,32 @@ export default function App() {
   // Form Modals State
   const [showNewMatterModal, setShowNewMatterModal] = useState(false);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showHearingModal, setShowHearingModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [viewDetailMatter, setViewDetailMatter] = useState<Matter | null>(null);
+
+  const [newTaskForm, setNewTaskForm] = useState({
+    title: "",
+    priority: "Medium",
+    dueDate: "2026-06-25",
+    assignee: ""
+  });
+
+  const [newInvoiceForm, setNewInvoiceForm] = useState({
+    firm: "",
+    amount: "150000",
+    matterId: ""
+  });
+
+  const [newHearingForm, setNewHearingForm] = useState({
+    matterId: "",
+    hearingDate: "2026-06-15",
+    court: "",
+    remarks: ""
+  });
 
   // Global Search
   const [globalSearchInput, setGlobalSearchInput] = useState("");
@@ -385,6 +408,115 @@ export default function App() {
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  // Subtrack modals submission handlers
+  const handleCreateNoticeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeUser) return;
+    try {
+      const resp = await handleClientSideFallback("/api/notices", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-id": activeUser.id 
+        },
+        body: JSON.stringify({
+          type: "Incoming",
+          subType: newNoticeForm.subType,
+          senderOrRecipient: newNoticeForm.senderOrRecipient,
+          receivedOrSentDate: new Date().toISOString().slice(0, 10),
+          deadlineDate: newNoticeForm.deadlineDate || null,
+          description: newNoticeForm.description,
+          legalTeamLead: newNoticeForm.legalTeamLead || activeUser.name,
+          company: effectiveCompany === "Group" ? "Yajur" : effectiveCompany
+        })
+      });
+      if (resp.ok) {
+        setShowNoticeModal(false);
+        setRefreshTrigger(prev => prev + 1);
+        setNewNoticeForm({
+          subType: "Labour",
+          senderOrRecipient: "",
+          deadlineDate: "",
+          description: "",
+          legalTeamLead: ""
+        });
+      } else {
+        const d = await resp.json();
+        alert(d.error || "Failed to log notice");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateHearingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeUser) return;
+    try {
+      const resp = await handleClientSideFallback("/api/hearings", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-id": activeUser.id 
+        },
+        body: JSON.stringify({
+          matterId: newHearingForm.matterId,
+          hearingDate: newHearingForm.hearingDate,
+          court: newHearingForm.court,
+          remarks: newHearingForm.remarks
+        })
+      });
+      if (resp.ok) {
+        setShowHearingModal(false);
+        setRefreshTrigger(prev => prev + 1);
+        setNewHearingForm({
+          matterId: "",
+          hearingDate: "2026-06-15",
+          court: "",
+          remarks: ""
+        });
+      } else {
+        const d = await resp.json();
+        alert(d.error || "Failed to schedule hearing");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateTaskSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskForm.title.trim()) return;
+
+    setTasks(prev => [...prev, {
+      id: `TSK-0${prev.length + 1}`,
+      company: effectiveCompany === "Group" ? "Yajur" : effectiveCompany,
+      title: newTaskForm.title,
+      assignee: newTaskForm.assignee || "Unassigned",
+      priority: newTaskForm.priority as any,
+      dueDate: newTaskForm.dueDate,
+      status: "To Do"
+    }]);
+    setShowTaskModal(false);
+  };
+
+  const handleCreateInvoiceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newInvoiceForm.firm.trim()) return;
+
+    setInvoices(prev => [...prev, {
+      id: `INV-2026-30${prev.length + 1}`,
+      company: effectiveCompany === "Group" ? "Yajur" : effectiveCompany,
+      firm: newInvoiceForm.firm,
+      matter: newInvoiceForm.matterId,
+      amount: Number(newInvoiceForm.amount) || 150000,
+      date: new Date().toISOString().slice(0, 10),
+      dueDate: "2026-07-15",
+      status: "Pending"
+    }]);
+    setShowInvoiceModal(false);
   };
 
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
@@ -765,6 +897,24 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            {activeTab === "calendar" && ["Super Admin", "Company Admin", "Legal Head"].includes(activeUser?.role || "") && (
+              <button
+                onClick={() => {
+                  setNewHearingForm({
+                    matterId: matters.filter(m => effectiveCompany === "Group" || m.company === effectiveCompany)[0]?.id || "",
+                    hearingDate: "2026-06-15",
+                    court: "",
+                    remarks: ""
+                  });
+                  setShowHearingModal(true);
+                }}
+                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Schedule Court Hearing</span>
+              </button>
+            )}
+
             {/* Global search trigger */}
             <button 
               onClick={() => setShowSearchModal(true)}
@@ -861,36 +1011,23 @@ export default function App() {
               onPayInvoice={handlePayInvoiceAction}
               onTaskProgress={handleTaskProgressAction}
               onAddTaskClick={() => {
-                const title = prompt("Enter task title:");
-                if (title) {
-                  setTasks(prev => [...prev, {
-                    id: `TSK-00${prev.length + 1}`,
-                    company: effectiveCompany,
-                    title,
-                    assignee: activeUser?.name || "Unassigned",
-                    priority: "Medium",
-                    dueDate: "2026-06-25",
-                    status: "To Do"
-                  }]);
-                }
+                setNewTaskForm({
+                  title: "",
+                  priority: "Medium",
+                  dueDate: "2026-06-25",
+                  assignee: activeUser?.name || ""
+                });
+                setShowTaskModal(true);
               }}
-              onAddCounselClick={() => alert("Retainership details form launched.")}
-              onAddContactClick={() => alert("Registering contact profile.")}
+              onAddCounselClick={() => alert("ℹ️ Retainership details form integrated. Add counsels details or roster firms by logging an active invoice linked to litigation matters.")}
+              onAddContactClick={() => alert("ℹ️ Central corporate legal contacts directory loaded. Ensure directory context is updated during physical file sync.")}
               onAddInvoiceClick={() => {
-                const amount = prompt("Enter invoice amount (INR):", "150000");
-                const firm = prompt("Enter firm/advocate name:", "Advocate Debasish Kar");
-                if (amount && firm) {
-                  setInvoices(prev => [...prev, {
-                    id: `INV-2026-30${prev.length + 1}`,
-                    company: effectiveCompany,
-                    firm,
-                    matter: "MAT-Y-101",
-                    amount: Number(amount) || 150000,
-                    date: "2026-06-03",
-                    dueDate: "2026-07-03",
-                    status: "Pending"
-                  }]);
-                }
+                setNewInvoiceForm({
+                  firm: "",
+                  amount: "150000",
+                  matterId: matters.filter(m => effectiveCompany === "Group" || m.company === effectiveCompany)[0]?.id || ""
+                });
+                setShowInvoiceModal(true);
               }}
             />
           )}
@@ -1290,6 +1427,378 @@ export default function App() {
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg cursor-pointer font-bold"
                 >
                   Register profile
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* LOG NEW NOTICE FORM MODAL */}
+      {showNoticeModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/50 backdrop-blur-3xs p-4 font-sans select-none text-slate-800 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-3xl border border-slate-100 overflow-hidden text-xs">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-slate-150 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-indigo-300 font-mono tracking-wider uppercase">Compliance & notices</span>
+                <h3 className="text-sm font-bold mt-1 text-white">Log Regulatory / Judicial Notice</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowNoticeModal(false)}
+                className="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-full cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Creation Form */}
+            <form onSubmit={handleCreateNoticeSubmit} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Notice Category</label>
+                  <select
+                    value={newNoticeForm.subType}
+                    onChange={e => setNewNoticeForm(prev => ({ ...prev, subType: e.target.value }))}
+                    className="w-full text-xs bg-white border px-3 py-2.5 rounded-lg focus:border-indigo-500 outline-none cursor-pointer"
+                  >
+                    <option value="Labour">Labour Board</option>
+                    <option value="Provident Fund">Provident Fund Authority</option>
+                    <option value="GST">GST Custom Excise</option>
+                    <option value="Customs">Customs Department</option>
+                    <option value="Intellectual Property">Intellectual Property IP</option>
+                    <option value="Pollution Control">Pollution Control WBPCB</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Issuing Authority / Opponent</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="E.g. Commissioner of CGST"
+                    value={newNoticeForm.senderOrRecipient}
+                    onChange={e => setNewNoticeForm(prev => ({ ...prev, senderOrRecipient: e.target.value }))}
+                    className="w-full text-xs font-sans px-3 py-2.5 border rounded-lg focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Response Deadline Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={newNoticeForm.deadlineDate}
+                    onChange={e => setNewNoticeForm(prev => ({ ...prev, deadlineDate: e.target.value }))}
+                    className="w-full text-xs font-sans px-3 py-2.5 border rounded-lg focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Legal Team Lead</label>
+                  <input
+                    type="text"
+                    placeholder="E.g. Senior Council Sreemoyee Dey"
+                    value={newNoticeForm.legalTeamLead}
+                    onChange={e => setNewNoticeForm(prev => ({ ...prev, legalTeamLead: e.target.value }))}
+                    className="w-full text-xs font-sans px-3 py-2.5 border rounded-lg focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Mandates & Demands Details</label>
+                <textarea
+                  required
+                  placeholder="Detail outstanding claims, show cause reasons, statutory penalties mentioned, and response roadmap files..."
+                  value={newNoticeForm.description}
+                  onChange={e => setNewNoticeForm(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                  className="w-full text-xs p-3 bg-slate-50 border rounded-lg focus:bg-white focus:border-indigo-500 outline-none font-sans leading-relaxed"
+                />
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowNoticeModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg cursor-pointer font-bold select-none"
+                >
+                  Discard
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg cursor-pointer shadow-xs select-none"
+                >
+                  Register Notice
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* SCHEDULE HEARING COURT TRIAL MODAL */}
+      {showHearingModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/50 backdrop-blur-3xs p-4 font-sans select-none text-slate-800 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-3xl border border-slate-100 overflow-hidden text-xs">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-slate-150 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-indigo-300 font-mono tracking-wider uppercase">Judicial calendar tracking</span>
+                <h3 className="text-sm font-bold mt-1 text-white">Schedule Court Hearing Trial</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowHearingModal(false)}
+                className="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-full cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Creation Form */}
+            <form onSubmit={handleCreateHearingSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Link to Active Matter Folder</label>
+                <select
+                  value={newHearingForm.matterId}
+                  onChange={e => setNewHearingForm(prev => ({ ...prev, matterId: e.target.value }))}
+                  required
+                  className="w-full text-xs bg-white border px-3 py-2.5 rounded-lg focus:border-indigo-500 outline-none cursor-pointer"
+                >
+                  <option value="">-- Choose Matter --</option>
+                  {matters.filter(m => effectiveCompany === "Group" || m.company === effectiveCompany).map(m => (
+                    <option key={m.id} value={m.id}>{m.id} - {m.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Hearing Date</label>
+                <input
+                  type="date"
+                  required
+                  value={newHearingForm.hearingDate}
+                  onChange={e => setNewHearingForm(prev => ({ ...prev, hearingDate: e.target.value }))}
+                  className="w-full text-xs font-sans px-3 py-2.5 border rounded-lg focus:border-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Appointed Court Bench / Tribunal</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="E.g. Calcutta High Court, Bench No. 3"
+                  value={newHearingForm.court}
+                  onChange={e => setNewHearingForm(prev => ({ ...prev, court: e.target.value }))}
+                  className="w-full text-xs font-sans px-3 py-2.5 border rounded-lg focus:border-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Instructions & Remarks for Counsel</label>
+                <textarea
+                  placeholder="List instructions for the arguing senior counsel, briefs to carry, and critical outcomes desired..."
+                  value={newHearingForm.remarks}
+                  onChange={e => setNewHearingForm(prev => ({ ...prev, remarks: e.target.value }))}
+                  rows={2}
+                  className="w-full text-xs p-3 bg-slate-50 border rounded-lg focus:bg-white focus:border-indigo-500 outline-none font-sans leading-relaxed"
+                />
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowHearingModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg cursor-pointer font-bold select-none"
+                >
+                  Discard
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-650 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg cursor-pointer shadow-xs select-none animate-pulse"
+                >
+                  Add to Docket Calendar
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* CREATE NEW TASK MODAL */}
+      {showTaskModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/50 backdrop-blur-3xs p-4 font-sans select-none text-slate-800 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-3xl border border-slate-100 overflow-hidden text-xs">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-slate-150 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-indigo-300 font-mono tracking-wider uppercase">Tasks ledger</span>
+                <h3 className="text-sm font-bold mt-1 text-white">Log New Legal Action Task</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowTaskModal(false)}
+                className="text-slate-400 hover:text-white bg-slate-800 p-1 rounded-full cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateTaskSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Action Task Summary</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Task title e.g. File counters in Alipore"
+                  value={newTaskForm.title}
+                  onChange={e => setNewTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full text-xs font-sans px-3 py-2.5 border rounded-lg focus:border-indigo-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Task Priority</label>
+                  <select
+                    value={newTaskForm.priority}
+                    onChange={e => setNewTaskForm(prev => ({ ...prev, priority: e.target.value }))}
+                    className="w-full text-xs bg-white border px-3 py-2.5 rounded focus:border-indigo-500 outline-none cursor-pointer"
+                  >
+                    <option value="High">High Priority</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Due Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={newTaskForm.dueDate}
+                    onChange={e => setNewTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                    className="w-full text-xs font-sans px-3 py-2 border rounded focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Assigned Counselor</label>
+                <input
+                  type="text"
+                  placeholder="E.g. Advocate Rajeev Sen"
+                  value={newTaskForm.assignee}
+                  onChange={e => setNewTaskForm(prev => ({ ...prev, assignee: e.target.value }))}
+                  className="w-full text-xs font-sans px-3 py-2.5 border rounded-lg focus:border-indigo-500 outline-none"
+                />
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowTaskModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg cursor-pointer font-bold select-none"
+                >
+                  Discard
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-650 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg cursor-pointer shadow-xs select-none"
+                >
+                  Register Task
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* CREATE NEW COUNSEL INVOICE MODAL */}
+      {showInvoiceModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/50 backdrop-blur-3xs p-4 font-sans select-none text-slate-800 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-3xl border border-slate-100 overflow-hidden text-xs">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-slate-150 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-indigo-300 font-mono tracking-wider uppercase">Billing ledger</span>
+                <h3 className="text-sm font-bold mt-1 text-white">Log Counsel Service Invoice</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowInvoiceModal(false)}
+                className="text-slate-400 hover:text-white bg-slate-800 p-1 rounded-full cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateInvoiceSubmit} className="p-5 space-y-4 font-sans text-xs">
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Advocate Or Legal Firm Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="E.g. Advocate Debasish Kar, Khaitan & Co"
+                  value={newInvoiceForm.firm}
+                  onChange={e => setNewInvoiceForm(prev => ({ ...prev, firm: e.target.value }))}
+                  className="w-full px-3 py-2.5 border rounded-lg bg-slate-50 focus:bg-white outline-none focus:border-indigo-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Invoice Amount (INR)</label>
+                  <input
+                    type="number"
+                    required
+                    value={newInvoiceForm.amount}
+                    onChange={e => setNewInvoiceForm(prev => ({ ...prev, amount: e.target.value }))}
+                    className="w-full px-3 py-2.5 border rounded-lg bg-slate-50 focus:bg-white outline-none focus:border-indigo-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Link to Case Matter</label>
+                  <select
+                    value={newInvoiceForm.matterId}
+                    onChange={e => setNewInvoiceForm(prev => ({ ...prev, matterId: e.target.value }))}
+                    className="w-full bg-slate-50 border p-2.5 rounded cursor-pointer outline-none focus:border-indigo-400 text-xs text-slate-700"
+                  >
+                    {matters.filter(m => effectiveCompany === "Group" || m.company === effectiveCompany).map(m => (
+                      <option key={m.id} value={m.id}>{m.id} - {m.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceModal(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-500 rounded-lg hover:bg-slate-50 cursor-pointer font-bold"
+                >
+                  Discard
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg cursor-pointer"
+                >
+                  File Ledger Invoice
                 </button>
               </div>
             </form>

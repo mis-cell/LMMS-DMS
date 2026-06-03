@@ -110,7 +110,19 @@ export default function DocumentsPanel({
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ["All", "Contracts", "Agreements", "Court Orders", "Pleadings", "Notices", "Licenses", "Internal Opinions"];
+  const categories = [
+    "All", 
+    "Contracts", 
+    "Agreements", 
+    "Court Orders", 
+    "Pleadings", 
+    "Notices", 
+    "Compliance Documents", 
+    "Licenses", 
+    "Certificates", 
+    "Intellectual Property Records", 
+    "Internal Legal Opinions"
+  ];
 
   const handleToggleSelect = (id: string) => {
     const copy = new Set(selectedDocIds);
@@ -176,9 +188,9 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
 
       try {
         const element = document.createElement("a");
-        const file = new Blob([content], { type: "application/pdf" });
+        const file = new Blob([content], { type: "text/plain;charset=utf-8" });
         element.href = URL.createObjectURL(file);
-        element.download = `${effectiveCompany.replace(/\s+/g, "_")}_Compliance_Summary_Portfolio.pdf`;
+        element.download = `${effectiveCompany.replace(/\s+/g, "_")}_Compliance_Summary_Portfolio.txt`;
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
@@ -304,12 +316,12 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
                   {isExporting ? (
                     <>
                       <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin mr-1"></div>
-                      Compiling PDF Portfolio...
+                      Compiling Audit Ledger...
                     </>
                   ) : (
                     <>
                       <Download className="w-3.5 h-3.5" />
-                      <span>Export Summary to PDF</span>
+                      <span>Export Audit Ledger (.txt)</span>
                     </>
                   )}
                 </button>

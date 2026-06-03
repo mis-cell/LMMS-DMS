@@ -25,6 +25,7 @@ export default function LegalAssistantChat({ user }: LegalAssistantChatProps) {
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [typingState, setTypingState] = useState("");
+  const [useSearchGrounding, setUseSearchGrounding] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,7 +99,8 @@ How can I assist you in your litigation risk management today?
           },
           body: JSON.stringify({
             message: textToSend,
-            chatHistory: historyPayload
+            chatHistory: historyPayload,
+            useSearch: useSearchGrounding
           })
         });
 
@@ -346,30 +348,45 @@ How can I assist you in your litigation risk management today?
       </div>
 
       {/* Input container */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSend(inputText);
-        }}
-        className="p-3 border-t border-slate-100 bg-slate-50/50 flex gap-2"
-      >
-        <input
-          type="text"
-          placeholder="Ask Counselor (e.g. 'Show labuor disputes in Bally Jute' or 'Summarize high exposure matters')..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          disabled={isTyping}
-          className="flex-1 bg-white border border-slate-200 focus:border-indigo-500 text-xs rounded-lg px-3 py-2.5 outline-none font-sans"
-        />
-        <button
-          id="send-chat-message-btn"
-          type="submit"
-          disabled={!inputText.trim() || isTyping}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg p-2.5 transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+      <div className="border-t border-slate-100 bg-slate-50/50 p-3 flex flex-col gap-2">
+        <div className="flex items-center gap-2 px-1 text-[10px] select-none text-slate-500">
+          <input
+            type="checkbox"
+            id="search-grounding-check"
+            checked={useSearchGrounding}
+            onChange={(e) => setUseSearchGrounding(e.target.checked)}
+            className="w-3.5 h-3.5 rounded text-indigo-600 bg-white border border-slate-300 focus:ring-0 cursor-pointer"
+          />
+          <label htmlFor="search-grounding-check" className="cursor-pointer font-bold uppercase tracking-wider flex items-center gap-1">
+            🌐 Enable Google Search Grounding <span className="text-indigo-600 font-extrabold text-[9px] lowercase">(pulls live court lists & state tax laws)</span>
+          </label>
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend(inputText);
+          }}
+          className="flex gap-2"
         >
-          <Send className="h-4 w-4" />
-        </button>
-      </form>
+          <input
+            type="text"
+            placeholder="Ask Counselor (e.g. 'Show labour disputes in Bally Jute' or 'Summarize high exposure matters')..."
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            disabled={isTyping}
+            className="flex-1 bg-white border border-slate-200 focus:border-indigo-500 text-xs rounded-lg px-3 py-2.5 outline-none font-sans"
+          />
+          <button
+            id="send-chat-message-btn"
+            type="submit"
+            disabled={!inputText.trim() || isTyping}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg p-2.5 transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

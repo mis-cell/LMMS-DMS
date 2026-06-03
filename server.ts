@@ -886,9 +886,12 @@ app.post("/api/ai/assistant", async (req: Request, res: Response) => {
         parts: [{ text: message }]
       });
 
+      const useSearch = req.body.useSearch === true;
+
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
         contents: apiMessages,
+        ...(useSearch ? { tools: [{ googleSearch: {} }] } : {})
       });
 
       const reply = response.text || "I was unable to formulate an answer. Could you please rephrase?";
