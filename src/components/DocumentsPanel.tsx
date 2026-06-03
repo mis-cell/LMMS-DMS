@@ -75,6 +75,24 @@ export default function DocumentsPanel({
   const [editParties, setEditParties] = useState("");
   const [editExpiryDate, setEditExpiryDate] = useState("");
 
+  // Zoho-inspired Contract Builder States
+  const [selectedTemplateIndex, setSelectedTemplateIndex] = useState<number | null>(null);
+  const [builderFileName, setBuilderFileName] = useState("Custom_Corporate_Sourcing_Contract.txt");
+  const [clauseParties, setClauseParties] = useState(
+    "This AGREEMENT is entered into on this day by and between YAJuR INDUSTRIES DIVISION, hereinafter referred to as the 'Procuring Tenant', and BENGAL LOGISTICAL HUB LTD, hereinafter referred to as the 'Consolidation partner'."
+  );
+  const [clauseIndemnity, setClauseIndemnity] = useState(
+    "The Contractor warrants that all Goods Service Tax (GST) returns, including State GST (SGST) and Central GST (CGST) of 9% each, shall be filed timely. The Contractor shall hold the Company harmless against external tax credit (ITC) claim shortfalls occurring from Contractor's defaults."
+  );
+  const [clauseTermination, setClauseTermination] = useState(
+    "Either party may terminate this agreement upon supplying thirty (30) written calendar days of advance notice. All completed milestones and billings prior to the termination date shall be cleared immediately."
+  );
+  const [clauseJurisdiction, setClauseJurisdiction] = useState(
+    "Any dispute, difference or claim arising under this contract shall be submitted to the sole arbitration of an independent arbitrator appointed under the Arbitration and Conciliation Act, 1996. The seat of arbitration shall be Kolkata, and Alipore Civil Courts shall have exclusive jurisdiction."
+  );
+  const [isAssembling, setIsAssembling] = useState(false);
+  const [assembleStatus, setAssembleStatus] = useState("");
+
   const handleStartEdit = (doc: LegalDocument) => {
     setEditingDoc(doc);
     setEditFileName(doc.fileName);
@@ -434,26 +452,236 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
       )}
 
       {tab === "templates" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { title: "Standard Non-Disclosure Agreement", code: "TMP-NDA-201", use: "Sourcing disclosures" },
-            { title: "Memorandum of Understanding (MOU)", code: "TMP-MOU-105", use: "JV collaborations" },
-            { title: "Standard Commercial Vendor Contract", code: "TMP-SVR-301", use: "Commercial purchases" },
-            { title: "Kolkata Physical Site Lease Deed", code: "TMP-LSD-099", use: "Real estate properties" },
-            { title: "Employment Agreement Boilerplate", code: "TMP-EMP-204", use: "Payroll hiring" },
-            { title: "Out-of-court Settlement Agreement", code: "TMP-SET-441", use: "Labour unions" }
-          ].map((tmpl, idx) => (
-            <div key={idx} className="bg-white border rounded-xl p-4 shadow-3xs flex flex-col justify-between h-36">
-              <div>
-                <h4 className="text-xs font-bold text-slate-800">{tmpl.title}</h4>
-                <p className="text-[10px] text-slate-400 mt-1">Designed for: {tmpl.use}</p>
-              </div>
-              <div className="border-t border-slate-50 pt-2 flex items-center justify-between text-[10.5px]">
-                <span className="font-mono font-bold text-slate-400">{tmpl.code}</span>
-                <span className="text-indigo-600 font-bold hover:underline cursor-pointer">Download Template &rarr;</span>
+        <div className="space-y-6">
+          {/* Top Banner introducing Zoho CLM approach */}
+          <div className="bg-gradient-to-r from-slate-50 to-indigo-50/20 border rounded-xl p-4 flex items-start gap-3 select-none">
+            <div className="p-2 bg-indigo-100/50 rounded-lg text-indigo-700 shrink-0">
+              <FileCheck className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-905 text-slate-800 uppercase tracking-wider">Zoho CLM-Inspired Contract Assembly & Clause Library</h4>
+              <p className="text-[11px] text-slate-500 font-sans mt-0.5 leading-normal">
+                Select from standard corporate presets or construct custom agreements by choosing and customizing key clauses. 
+                Click <strong>Assemble & Sync</strong> to compile, sign, and instantly sync raw TXT file assets directly into your 
+                isolated tenant Google Drive folder and central Supabase dockets.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Left Column: Presets list */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Pre-Drafted Boilerplates</h4>
+              <div className="space-y-3">
+                {[
+                  { 
+                    title: "Standard Non-Disclosure Agreement", 
+                    code: "TMP-NDA-201", 
+                    use: "Sourcing disclosures",
+                    parties: "This NON-DISCLOSURE AGREEMENT (NDA) is executed by and between YAJuR INDUSTRIES DIVISION, hereinafter referred to as 'Disclosing Party', and BENGAL LOGISTICAL HUB LTD, referred to as 'Receiving Party', to guard trade secrets and fiscal values.",
+                    indemnity: "The Receiving Party agrees to indemnify the Disclosing Party against tax-credit or trade losses resulting from data leaks of up to ₹15,00,000 INR, inclusive of SGST/CGST liabilities.",
+                    termination: "This Agreement remains operative for 36 months unless terminated with 30 written calendar days of advance notice.",
+                    jurisdiction: "All dispute processes shall be bound to Alipore Civil Courts exclusive seat in Kolkata, India."
+                  },
+                  { 
+                    title: "Memorandum of Understanding (MOU)", 
+                    code: "TMP-MOU-105", 
+                    use: "JV collaborations",
+                    parties: "This MEMORANDUM OF UNDERSTANDING (MOU) records the mutual agenda of BALLY JUTE MILLING CO. ENTERPRISE and the REGIONAL LOGISTICAL COUNCIL to upgrade traditional jute refining channels.",
+                    indemnity: "Both parties share industrial process exposures. Any ESIC, EPF, or union penalty resulting from contractor defaults shall be shared equally.",
+                    termination: "Operative for twelve (12) months or until formal execution of standard commercial vendor covenants.",
+                    jurisdiction: "The civil court in Kolkata shall possess exclusive first instance jurisdiction."
+                  },
+                  { 
+                    title: "Kolkata Physical Site Lease Deed", 
+                    code: "TMP-LSD-099", 
+                    use: "Real estate properties",
+                    parties: "This SITE LEASE COVENANT is entered between YASHODA ENTERPRISES LTD, hereinafter referred to as 'Lessor', and INFRA PROJECTS BENCHMARK, hereinafter the 'Lessee'.",
+                    indemnity: "The Lessee warrants full GST tax payment compliance (18% aggregate) and holding Lessor harmless against Calcutta Municipal Corporation fines.",
+                    termination: "Lease terminates automatically on May 31, 2031, unless extended in writing by mutual lease dockets.",
+                    jurisdiction: "Exclusive jurisdiction belongs to the Hon'ble Calcutta High Court (Original Side)."
+                  },
+                  { 
+                    title: "Employment Agreement Boilerplate", 
+                    code: "TMP-EMP-204", 
+                    use: "Payroll hiring`,",
+                    parties: "This EMPLOYMENT COVENANT is entered into by and between BALLY JUTE CO., and the joining Employee.",
+                    indemnity: "The Employee agrees to refrain from disclosing proprietary design methods, or inciting trade union disruption.",
+                    termination: "Either party may terminate the deployment under 60 days standard check-notice.",
+                    jurisdiction: "Governed under the Laws of West Bengal and trade courts in Alipore."
+                  }
+                ].map((tmpl, idx) => (
+                  <div 
+                    key={idx} 
+                    onClick={() => {
+                      setSelectedTemplateIndex(idx);
+                      const cleanName = tmpl.title.replace(/[^a-zA-Z0-9]/g, "_") + ".txt";
+                      setBuilderFileName(cleanName);
+                      setClauseParties(tmpl.parties);
+                      setClauseIndemnity(tmpl.indemnity);
+                      setClauseTermination(tmpl.termination);
+                      setClauseJurisdiction(tmpl.jurisdiction);
+                      setAssembleStatus(`Loaded preset: ${tmpl.code}`);
+                      setTimeout(() => setAssembleStatus(""), 2000);
+                    }}
+                    className={`bg-white border rounded-xl p-4 shadow-3xs cursor-pointer hover:border-indigo-400 border-slate-150 transition-all ${selectedTemplateIndex === idx ? "border-indigo-600 bg-indigo-50/5/10 ring-1 ring-indigo-600" : ""}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="font-mono text-[9px] font-bold text-indigo-600 uppercase bg-slate-50 border px-1.5 py-0.5 rounded leading-none">{tmpl.code}</span>
+                      <span className="text-[10px] text-slate-400">{tmpl.use}</span>
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-805 mt-2.5">{tmpl.title}</h5>
+                    <p className="text-[10px] text-slate-400 mt-1 italic">Click to load into Custom Builder &rarr;</p>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+
+            {/* Right Column (2 spans): Zoho Clause Assembly Canvas */}
+            <div className="lg:col-span-2 space-y-4">
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Standard Clause Builder Canvas</h4>
+              
+              <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-xs space-y-4">
+                
+                {/* File configuration name */}
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1.5">Compiled Contract Output Filename</label>
+                  <input
+                    type="text"
+                    value={builderFileName}
+                    onChange={(e) => setBuilderFileName(e.target.value)}
+                    className="w-full text-xs font-mono p-2.5 bg-slate-50 border rounded-lg selection:bg-indigo-150 border-slate-150 outline-none focus:border-indigo-505"
+                    placeholder="legal_contract_agreement.txt"
+                  />
+                </div>
+
+                {/* Clause 1: Parties */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-slate-700">Clause I. Contracting Parties</span>
+                    <span className="text-[10px] text-slate-400 italic">Central registry mapping</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={clauseParties}
+                    onChange={(e) => setClauseParties(e.target.value)}
+                    className="w-full text-xs p-2.5 border rounded-lg font-sans border-slate-150 outline-none focus:border-indigo-500 bg-white"
+                  />
+                </div>
+
+                {/* Clause 2: Indemnity */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-slate-700">Clause II. Regional Tax GST & Indemnity</span>
+                    <span className="text-[10px] text-red-500 font-bold">CGST (9%) + SGST (9%) compliance</span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={clauseIndemnity}
+                    onChange={(e) => setClauseIndemnity(e.target.value)}
+                    className="w-full text-xs p-2.5 border rounded-lg font-sans border-slate-150 outline-none focus:border-indigo-500 bg-white"
+                  />
+                </div>
+
+                {/* Clause 3: Termination */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-slate-700">Clause III. Contract Life & Termination notice</span>
+                    <span className="text-[10px] text-slate-400 italic">DMS Version Log Tracking</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={clauseTermination}
+                    onChange={(e) => setClauseTermination(e.target.value)}
+                    className="w-full text-xs p-2.5 border rounded-lg font-sans border-slate-150 outline-none focus:border-indigo-500 bg-white"
+                  />
+                </div>
+
+                {/* Clause 4: Jurisdiction */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-slate-700">Clause IV. Dispute resolution & Indian Courts Venue</span>
+                    <span className="text-[10px] text-indigo-600 font-bold">Kolkata Seat & Alipore Jurisdiction</span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={clauseJurisdiction}
+                    onChange={(e) => setClauseJurisdiction(e.target.value)}
+                    className="w-full text-xs p-2.5 border rounded-lg font-sans border-slate-150 outline-none focus:border-indigo-500 bg-white"
+                  />
+                </div>
+
+                {/* Compile Feedback */}
+                {assembleStatus && (
+                  <div className="p-3 bg-blue-50 border border-blue-100 text-blue-800 rounded font-bold text-center leading-none text-[11px]">
+                    {assembleStatus}
+                  </div>
+                )}
+
+                {/* Action build trigger */}
+                <div className="pt-2 border-t flex justify-between items-center">
+                  <span className="text-[10.5px] text-slate-400 leading-tight">
+                    Tenant Target: <strong className="text-slate-705 text-slate-600">{effectiveCompany} Google Drive Directory</strong>
+                  </span>
+                  <button
+                    disabled={isAssembling || !onUpload}
+                    onClick={async () => {
+                      if (!onUpload) return;
+                      setIsAssembling(true);
+                      setAssembleStatus("Compiling local clause template blocks...");
+                      
+                      const compiledText = [
+                        "=============================================================",
+                        "      ZOHO CLM ASSEMBLED ENTERPRISE LEGAL AGREEMENT          ",
+                        "=============================================================",
+                        "This agreement is automatically compiled as a certified deed ",
+                        `for corporate division: ${effectiveCompany}.`,
+                        "=============================================================",
+                        "",
+                        "ARTICLE I. CONTRACTING PARTIES & SEAL:",
+                        clauseParties,
+                        "",
+                        "ARTICLE II. INDEMNITY & REGIONAL CGST/SGST INDEMNITY PROVISIONS:",
+                        clauseIndemnity,
+                        "",
+                        "ARTICLE III. LIFE CYCLES & STATUS TERMINATION RULES:",
+                        clauseTermination,
+                        "",
+                        "ARTICLE IV. ARBITRATION ACT & COURT JURISDICTION:",
+                        clauseJurisdiction,
+                        "",
+                        "=============================================================",
+                        `Assembled on: ${new Date().toISOString()}`,
+                        `Assembled by model agent: LRLMS Zoho Contracts CRM module`
+                      ].join("\n");
+
+                      try {
+                        await onUpload({
+                          fileName: builderFileName,
+                          category: "Contracts",
+                          matterId: null,
+                          textContent: compiledText
+                        });
+                        setAssembleStatus("Successfully synced to GDrive & written to Supabase SQL Database!");
+                      } catch (err: any) {
+                        setAssembleStatus(`Upload Error: ${err?.message || err}`);
+                      } finally {
+                        setIsAssembling(false);
+                        setTimeout(() => setAssembleStatus(""), 4000);
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs hover:shadow-md cursor-pointer transition select-none flex items-center gap-1.5"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isAssembling ? "animate-spin" : ""}`} />
+                    <span>{isAssembling ? "Synthesizing and Uploading..." : "Assemble Contract & Sync Cloud"}</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 

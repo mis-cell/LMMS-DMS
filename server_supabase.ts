@@ -468,6 +468,31 @@ CREATE TABLE IF NOT EXISTS lrlms_audit_logs (
   "details" TEXT NOT NULL
 );
 
+-- 7. Create Invoices Table (Zoho Invoice Integration with SGST/CGST)
+CREATE TABLE IF NOT EXISTS lrlms_invoices (
+  "id" TEXT PRIMARY KEY,
+  "company" TEXT NOT NULL,
+  "firm" TEXT NOT NULL,
+  "matter" TEXT,
+  "amount" NUMERIC NOT NULL,
+  "cgst" NUMERIC NOT NULL DEFAULT 0,
+  "sgst" NUMERIC NOT NULL DEFAULT 0,
+  "date" TEXT NOT NULL,
+  "dueDate" TEXT NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'Pending'
+);
+
+-- 8. Create Standard Contract Clauses Table (Zoho Contract CLM Integration)
+CREATE TABLE IF NOT EXISTS lrlms_clauses (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "type" TEXT NOT NULL,
+  "parties" TEXT NOT NULL,
+  "indemnity" TEXT NOT NULL,
+  "termination" TEXT NOT NULL,
+  "jurisdiction" TEXT NOT NULL
+);
+
 -- Ensure correct permissions
 ALTER TABLE lrlms_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_matters ENABLE ROW LEVEL SECURITY;
@@ -475,6 +500,8 @@ ALTER TABLE lrlms_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_notices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_hearings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lrlms_invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lrlms_clauses ENABLE ROW LEVEL SECURITY;
 
 -- Allow anonymous public access profiles
 CREATE POLICY "Allow public select" ON lrlms_users FOR SELECT USING (true);
@@ -500,5 +527,13 @@ CREATE POLICY "Allow public update hearings" ON lrlms_hearings FOR UPDATE USING 
 CREATE POLICY "Allow public select audits" ON lrlms_audit_logs FOR SELECT USING (true);
 CREATE POLICY "Allow public insert audits" ON lrlms_audit_logs FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update audits" ON lrlms_audit_logs FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public select invoices" ON lrlms_invoices FOR SELECT USING (true);
+CREATE POLICY "Allow public insert invoices" ON lrlms_invoices FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update invoices" ON lrlms_invoices FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public select clauses" ON lrlms_clauses FOR SELECT USING (true);
+CREATE POLICY "Allow public insert clauses" ON lrlms_clauses FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update clauses" ON lrlms_clauses FOR UPDATE USING (true);
 `;
 }

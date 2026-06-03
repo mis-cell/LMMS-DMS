@@ -26,6 +26,7 @@ interface FinancePeoplePanelProps {
   onAddCounselClick: () => void;
   onAddContactClick: () => void;
   onAddInvoiceClick: () => void;
+  matters: any[];
 }
 
 export default function FinancePeoplePanel({
@@ -39,7 +40,8 @@ export default function FinancePeoplePanel({
   onAddTaskClick,
   onAddCounselClick,
   onAddContactClick,
-  onAddInvoiceClick
+  onAddInvoiceClick,
+  matters
 }: FinancePeoplePanelProps) {
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [contactSearch, setContactSearch] = useState("");
@@ -142,42 +144,84 @@ export default function FinancePeoplePanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredInvoices.map(inv => (
-                  <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 pl-5 font-mono font-bold text-slate-450 text-slate-500">{inv.id}</td>
-                    <td className="p-4 font-semibold text-slate-800">{inv.firm}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        inv.company === "Yajur" ? "bg-blue-50 text-blue-700" : inv.company === "Bally Jute" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"
-                      }`}>
-                        {inv.company}
-                      </span>
-                    </td>
-                    <td className="p-4 font-mono text-indigo-600 font-semibold">{inv.matter}</td>
-                    <td className="p-4 text-right font-mono font-bold text-slate-905">₹{inv.amount.toLocaleString()}</td>
-                    <td className="p-4 font-mono">{inv.date}</td>
-                    <td className="p-4 font-mono text-rose-650 text-rose-600 font-semibold">{inv.dueDate}</td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${
-                        inv.status === "Paid" ? "bg-emerald-55 bg-emerald-50 text-emerald-700 border border-emerald-150" : inv.status === "Pending" ? "bg-amber-50 text-amber-700 border border-amber-150" : "bg-rose-50 text-rose-750 text-rose-700 border border-rose-150"
-                      }`}>
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="p-4 pr-5 text-right">
-                      {inv.status !== "Paid" ? (
-                        <button
-                          onClick={() => onPayInvoice(inv.id)}
-                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded cursor-pointer transition select-none"
-                        >
-                          Clear Bill
-                        </button>
-                      ) : (
-                        <span className="text-slate-400 font-sans italic text-[11px]">Paid & receipted</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {filteredInvoices.map(inv => {
+                  const linkedMatter = matters.find(m => m.id === inv.matter);
+                  const isMatterLinked = !!linkedMatter;
+                  const limit = isMatterLinked ? (linkedMatter.value || 0) : 0;
+                  
+                  // Calculate total billed for this linked matter across all invoices
+                  const totalInvoicedForMatter = isMatterLinked 
+                    ? companyInvoices.filter(i => i.matter === inv.matter).reduce((acc, curr) => acc + curr.amount, 0)
+                    : 0;
+
+                  const hasBreachedBudget = isMatterLinked && totalInvoicedForMatter > limit;
+                  const gstBase = Math.round(inv.amount / 1.18);
+                  const cgstAmount = Math.round(gstBase * 0.09);
+                  const sgstAmount = Math.round(gstBase * 0.09);
+
+                  return (
+                    <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 pl-5 font-mono font-bold text-slate-450 text-slate-500">{inv.id}</td>
+                      <td className="p-4">
+                        <span className="font-semibold text-slate-800 block">{inv.firm}</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5 block font-sans">
+                          GST taxed: 9% CGST (₹{cgstAmount.toLocaleString()}) + 9% SGST (₹{sgstAmount.toLocaleString()})
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          inv.company === "Yajur" ? "bg-blue-50 text-blue-700" : inv.company === "Bally Jute" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"
+                        }`}>
+                          {inv.company}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className="font-mono text-indigo-600 font-semibold block">{inv.matter || "Standalone retainer"}</span>
+                        {isMatterLinked && (
+                          <div className="mt-1 font-sans text-[10.5px]">
+                            <span className="text-slate-400 block font-sans">
+                              Matter Valuation: ₹{limit.toLocaleString()}
+                            </span>
+                            {hasBreachedBudget ? (
+                              <span className="inline-flex items-center gap-1 mt-1 bg-rose-50 border border-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded text-[9.5px]">
+                                ⚠️ Budget Overrun of ₹{(totalInvoicedForMatter - limit).toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 mt-1 bg-blue-50 border border-blue-100/50 text-blue-650 font-semibold px-1.5 py-0.5 rounded text-[9.5px]">
+                                Base budget safe (₹{totalInvoicedForMatter.toLocaleString()} billed)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="font-mono font-bold text-slate-905 block">₹{inv.amount.toLocaleString()}</span>
+                        <span className="text-[10px] text-slate-450 text-slate-450 italic font-mono block">Exc: ₹{gstBase.toLocaleString()}</span>
+                      </td>
+                      <td className="p-4 font-mono">{inv.date}</td>
+                      <td className="p-4 font-mono text-rose-650 text-rose-600 font-semibold">{inv.dueDate}</td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${
+                          inv.status === "Paid" ? "bg-emerald-55 bg-emerald-50 text-emerald-700 border border-emerald-150" : inv.status === "Pending" ? "bg-amber-50 text-amber-700 border border-amber-150" : "bg-rose-50 text-rose-750 text-rose-700 border border-rose-150"
+                        }`}>
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="p-4 pr-5 text-right">
+                        {inv.status !== "Paid" ? (
+                          <button
+                            onClick={() => onPayInvoice(inv.id)}
+                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded cursor-pointer transition select-none"
+                          >
+                            Clear Bill
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-sans italic text-[11px]">Paid & receipted</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -1072,6 +1072,7 @@ export default function App() {
               tab={activeTab}
               tasks={tasks}
               invoices={invoices}
+              matters={matters}
               activeUser={activeUser}
               effectiveCompany={effectiveCompany}
               onPayInvoice={handlePayInvoiceAction}
