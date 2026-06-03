@@ -9,6 +9,7 @@ interface IntelligencePanelProps {
   activeUser: any;
   effectiveCompany: string;
   matters: Matter[];
+  invoices?: any[];
 }
 
 export default function IntelligencePanel({
@@ -17,9 +18,12 @@ export default function IntelligencePanel({
   onDownloadAuditLogsCSV,
   activeUser,
   effectiveCompany,
-  matters
+  matters,
+  invoices = []
 }: IntelligencePanelProps) {
   const [auditSearch, setAuditSearch] = useState("");
+  const [hoveredBar, setHoveredBar] = useState<any>(null);
+  const [activeMetric, setActiveMetric] = useState<"exposure" | "invoiced" | "both">("both");
 
   const companyAudits = auditLogs.filter(log => effectiveCompany === "Group" || log.company === effectiveCompany);
   const filteredAudits = companyAudits.filter(log => {
@@ -89,26 +93,171 @@ export default function IntelligencePanel({
               </div>
             </div>
 
-            {/* Chart 2: Divisions spends */}
-            <div className="bg-white border rounded-xl p-6 shadow-xs select-none">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-6 flex items-center gap-1.5">
-                <BarChart4 className="w-4 h-4 text-[#185FA5]" />
-                Budget Exposure Spends by Division
-              </h4>
-
-              <div className="flex items-end justify-around h-44 border-b pb-2 text-center text-xs">
-                {[
-                  { value: "₹18.4L", label: "Yajur Industries", pct: 110, col: "bg-[#185FA5]" },
-                  { value: "₹8.5L", label: "Bally Jute", pct: 60, col: "bg-[#854F0B]" },
-                  { value: "₹4.5L", label: "Yashoda", pct: 30, col: "bg-[#3B6D11]" }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col items-center gap-2">
-                    <span className="font-mono font-bold text-slate-800">{item.value}</span>
-                    <div className={`w-14 rounded-t-lg shadow-inner ${item.col}`} style={{ height: `${item.pct}px` }} />
-                    <span className="text-[10px] text-slate-400 font-bold block mt-1">{item.label}</span>
-                  </div>
-                ))}
+            {/* Chart 2: Dynamic Multi-Tenant spendings and exposure comparisons */}
+            <div className="bg-white border rounded-xl p-6 shadow-xs select-none relative">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <BarChart4 className="w-4 h-4 text-[#185FA5]" />
+                    Comparative Legal Spend Ledger
+                  </h4>
+                  <span className="text-[10px] text-slate-400">Comparing contract liability vs. actual lawyer fee billings</span>
+                </div>
+                {/* Metric filter buttons */}
+                <div className="flex bg-slate-50 p-1 rounded-lg border gap-0.5 text-[10px] font-semibold">
+                  <button
+                    onClick={() => setActiveMetric("both")}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition ${
+                      activeMetric === "both" ? "bg-indigo-600 text-white font-bold" : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Both
+                  </button>
+                  <button
+                    onClick={() => setActiveMetric("exposure")}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition ${
+                      activeMetric === "exposure" ? "bg-indigo-600 text-white font-bold" : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Exposure
+                  </button>
+                  <button
+                    onClick={() => setActiveMetric("invoiced")}
+                    className={`px-2 py-0.5 rounded cursor-pointer transition ${
+                      activeMetric === "invoiced" ? "bg-indigo-600 text-white font-bold" : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Invoiced
+                  </button>
+                </div>
               </div>
+
+              {/* Aggregation math */}
+              {(() => {
+                const companiesData = [
+                  { name: "Yajur Industries", key: "Yajur", colorExposure: "#185FA5", colorInvoiced: "#6366F1" },
+                  { name: "Bally Jute Co.", key: "Bally Jute", colorExposure: "#854F0B", colorInvoiced: "#Eab308" },
+                  { name: "Yashoda Enterprise", key: "Yashoda", colorExposure: "#3B6D11", colorInvoiced: "#10B981" }
+                ].map(co => {
+                  const exposureTotal = matters
+                    .filter(m => m.company === co.key)
+                    .reduce((sum, m) => sum + (m.value || 0), 0);
+
+                  const invoicedTotal = invoices
+                    .filter(inv => inv.company === co.key)
+                    .reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+                  return {
+                    ...co,
+                    exposure: exposureTotal,
+                    invoiced: invoicedTotal
+                  };
+                });
+
+                // Compute high bounds inside chart height bounds
+                const vals = [...companiesData.map(c => c.exposure), ...companiesData.map(c => c.invoiced)];
+                const limitMaximum = Math.max(...vals, 1);
+                const barSpanH = 130;
+
+                const formatINR = (val: number) => {
+                  if (val >= 10000000) {
+                    return `₹${(val / 10000000).toFixed(2)} Cr`;
+                  }
+                  if (val >= 100000) {
+                    return `₹${(val / 100000).toFixed(1)} L`;
+                  }
+                  return `₹${val.toLocaleString()}`;
+                };
+
+                return (
+                  <div className="space-y-4">
+                    {/* SVG Drawing Zone */}
+                    <div className="relative border-b pb-1.5 pt-4">
+                      {/* Grid Ticks */}
+                      <div className="absolute inset-x-0 top-0 h-[130px] flex flex-col justify-between pointer-events-none opacity-20">
+                        <div className="border-t border-slate-400 w-full text-[9px] text-slate-400 pt-0.5">{formatINR(limitMaximum)}</div>
+                        <div className="border-t border-slate-300 w-full text-[9px] text-slate-400 pt-0.5">{formatINR(limitMaximum * 0.66)}</div>
+                        <div className="border-t border-slate-300 w-full text-[9px] text-slate-400 pt-0.5">{formatINR(limitMaximum * 0.33)}</div>
+                        <div className="border-t border-slate-300 w-full text-[9px] text-slate-400">₹0</div>
+                      </div>
+
+                      {/* Align Bars */}
+                      <div className="flex justify-around items-end h-[130px] relative z-10 px-2">
+                        {companiesData.map((co, idx) => {
+                          const hExpo = (co.exposure / limitMaximum) * barSpanH;
+                          const hInvoiced = (co.invoiced / limitMaximum) * barSpanH;
+
+                          return (
+                            <div key={idx} className="flex flex-col items-center w-24">
+                              <div className="flex items-end justify-center gap-1.5 h-[130px] w-full">
+                                {/* Exposure Bar */}
+                                {(activeMetric === "both" || activeMetric === "exposure") && (
+                                  <div
+                                    onMouseEnter={() => setHoveredBar({
+                                      company: co.name,
+                                      type: "Portfolio Exposure Budget",
+                                      raw: co.exposure,
+                                      pretty: formatINR(co.exposure)
+                                    })}
+                                    onMouseLeave={() => setHoveredBar(null)}
+                                    className="w-4 rounded-t transition-all duration-300 hover:scale-x-110 shadow-sm cursor-help hover:brightness-105"
+                                    style={{
+                                      height: `${Math.max(4, hExpo)}px`,
+                                      backgroundColor: co.colorExposure
+                                    }}
+                                  />
+                                )}
+
+                                {/* Invoiced Bar */}
+                                {(activeMetric === "both" || activeMetric === "invoiced") && (
+                                  <div
+                                    onMouseEnter={() => setHoveredBar({
+                                      company: co.name,
+                                      type: "Invoiced Counsel Fees",
+                                      raw: co.invoiced,
+                                      pretty: formatINR(co.invoiced)
+                                    })}
+                                    onMouseLeave={() => setHoveredBar(null)}
+                                    className="w-4 rounded-t opacity-90 transition-all duration-300 hover:scale-x-110 shadow-sm cursor-help hover:brightness-105"
+                                    style={{
+                                      height: `${Math.max(4, hInvoiced)}px`,
+                                      backgroundColor: co.colorInvoiced
+                                    }}
+                                  />
+                                )}
+                              </div>
+                              <span className="text-[9.5px] text-slate-500 font-extrabold truncate w-full text-center mt-2">
+                                {co.key}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Interactive Tooltip Card */}
+                      {hoveredBar && (
+                        <div className="absolute top-1 bg-slate-900 text-white rounded-lg p-2.5 shadow-xl text-[10.5px] border border-slate-800 z-50 transition w-56 left-1/2 -translate-x-1/2">
+                          <span className="font-bold text-[11px] block text-indigo-305 text-indigo-300">{hoveredBar.company}</span>
+                          <span className="text-slate-400 block text-[9.5px] uppercase tracking-wider mt-0.5">{hoveredBar.type}</span>
+                          <strong className="block text-white font-mono mt-1 text-[13px]">{hoveredBar.pretty}</strong>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Spend legends */}
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-sans border-t border-slate-50 pt-2 text-slate-500 font-semibold">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded bg-slate-500 shrink-0" />
+                        <span>Solid: Exposure Budget</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded bg-indigo-400 shrink-0" />
+                        <span>Light / Stripe: Invoiced Billings</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { 
   Briefcase, 
   Clock, 
@@ -11,7 +11,10 @@ import {
   Users, 
   CheckCircle2, 
   ShieldCheck,
-  Gavel
+  Gavel,
+  ShieldAlert,
+  ChevronRight,
+  Database
 } from "lucide-react";
 import { Matter, LegalDocument, LegalNotice, Hearing } from "../types";
 
@@ -23,6 +26,7 @@ interface DashboardPanelProps {
   effectiveCompany: string;
   onTabChange: (tab: string) => void;
   theme: any;
+  onSelectDocument: (doc: LegalDocument) => void;
 }
 
 export default function DashboardPanel({
@@ -32,8 +36,10 @@ export default function DashboardPanel({
   hearings,
   effectiveCompany,
   onTabChange,
-  theme
+  theme,
+  onSelectDocument
 }: DashboardPanelProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   // Filter core items belonging to selected company
   const companyMatters = matters.filter(m => effectiveCompany === "Group" || m.company === effectiveCompany);
   const companyDocuments = documents.filter(d => effectiveCompany === "Group" || d.company === effectiveCompany);
@@ -60,7 +66,14 @@ export default function DashboardPanel({
     <div className="space-y-6">
       {/* KPI Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs hover:border-indigo-100 transition-colors">
+        <div 
+          onClick={() => setSelectedCategory(selectedCategory === "Active Matters" ? null : "Active Matters")}
+          className={`bg-white border rounded-xl p-5 shadow-xs transition-all duration-250 cursor-pointer ${
+            selectedCategory === "Active Matters" 
+              ? "ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50/5" 
+              : "border-slate-100 hover:border-indigo-300 hover:shadow-xs"
+          }`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Active Matters</span>
             <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600"><Briefcase className="w-4 h-4" /></span>
@@ -68,10 +81,18 @@ export default function DashboardPanel({
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display" style={{ color: theme.primary }}>{activeMattersCount}</h3>
             <span className="text-[11px] text-slate-400 block mt-1">↑ 3 initialized this month</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs hover:border-indigo-100 transition-colors">
+        <div 
+          onClick={() => setSelectedCategory(selectedCategory === "Pending Approvals" ? null : "Pending Approvals")}
+          className={`bg-white border rounded-xl p-5 shadow-xs transition-all duration-250 cursor-pointer ${
+            selectedCategory === "Pending Approvals" 
+              ? "ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50/5" 
+              : "border-slate-100 hover:border-indigo-300 hover:shadow-xs"
+          }`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Pending Approvals</span>
             <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600"><CheckCircle2 className="w-4 h-4" /></span>
@@ -79,10 +100,18 @@ export default function DashboardPanel({
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display text-amber-600">{pendingApprovalsCount} Documents</h3>
             <span className="text-[11px] text-amber-600 font-semibold block mt-1">4 core files need signing</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs hover:border-indigo-100 transition-colors">
+        <div 
+          onClick={() => setSelectedCategory(selectedCategory === "Upcoming Hearings" ? null : "Upcoming Hearings")}
+          className={`bg-white border rounded-xl p-5 shadow-xs transition-all duration-250 cursor-pointer ${
+            selectedCategory === "Upcoming Hearings" 
+              ? "ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50/5" 
+              : "border-slate-100 hover:border-indigo-300 hover:shadow-xs"
+          }`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Upcoming Hearings</span>
             <span className="p-1.5 rounded-lg bg-red-50 text-red-650 text-red-600"><Gavel className="w-4 h-4" /></span>
@@ -90,10 +119,18 @@ export default function DashboardPanel({
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display text-red-650 text-red-600">{upcomingHearingsCount} Docket trials</h3>
             <span className="text-[11px] text-red-650 text-red-500 font-medium block mt-1">Next trial: 08 Jun 2026</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs hover:border-indigo-100 transition-colors">
+        <div 
+          onClick={() => setSelectedCategory(selectedCategory === "Legal Spend Ledger" ? null : "Legal Spend Ledger")}
+          className={`bg-white border rounded-xl p-5 shadow-xs transition-all duration-250 cursor-pointer ${
+            selectedCategory === "Legal Spend Ledger" 
+              ? "ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50/5" 
+              : "border-slate-100 hover:border-indigo-300 hover:shadow-xs"
+          }`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Legal Spend Ledger</span>
             <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600"><DollarSign className="w-4 h-4" /></span>
@@ -101,9 +138,84 @@ export default function DashboardPanel({
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display text-emerald-600">₹{formattedExposureLakhs}</h3>
             <span className="text-[11px] text-slate-400 block mt-1">Isolated Corporate Trial Budget</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
           </div>
         </div>
       </div>
+
+      {/* Relevant Documents Block (Renders Dynamically upon clicking KPI card) */}
+      {selectedCategory && (
+        <div className="bg-slate-900 border border-slate-800 text-white rounded-xl p-5 shadow-lg space-y-4 animate-in fade-in slide-in-from-top-3 duration-250">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-widest text-[#E6F1FB]">
+                  Relevant Synced Documents
+                </h4>
+                <p className="text-[10px] text-slate-400">Live Secure Isolated Partition: <strong className="text-indigo-300 font-mono">{selectedCategory}</strong> ({companyDocuments.length} total repository logs)</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setSelectedCategory(null)}
+              className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"
+            >
+              Close Ledger View &times;
+            </button>
+          </div>
+
+          {/* Filtering */}
+          {(() => {
+            let matchedDocs = companyDocuments;
+            if (selectedCategory === "Pending Approvals") {
+              matchedDocs = companyDocuments.filter(d => d.riskLevel === "High" || d.category === "Contracts");
+            } else if (selectedCategory === "Upcoming Hearings") {
+              matchedDocs = companyDocuments.filter(d => d.category.includes("Court") || d.category.includes("Pleadings"));
+            } else if (selectedCategory === "Legal Spend Ledger") {
+              matchedDocs = companyDocuments.filter(d => d.category.includes("Opinions") || d.category.includes("Contracts"));
+            }
+
+            if (matchedDocs.length === 0) {
+              return (
+                <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                  No explicit metadata dockets found synced for selected corporate entity context in this category.
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {matchedDocs.map(doc => (
+                  <div 
+                    key={doc.id}
+                    onClick={() => onSelectDocument(doc)}
+                    className="group bg-slate-800 border border-slate-700/60 rounded-lg p-3 hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between hover:bg-slate-700/40"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="p-1.5 rounded bg-slate-700/50 text-indigo-300 group-hover:text-white"><FileText className="w-4 h-4" /></span>
+                        <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                          doc.riskLevel === "High" ? "bg-red-950 text-red-400" : "bg-emerald-950 text-emerald-400"
+                        }`}>
+                          Risk: {doc.riskLevel || "Low"}
+                        </span>
+                      </div>
+                      <h5 className="text-[11.5px] font-bold text-white mt-2 truncate font-mono" title={doc.fileName}>{doc.fileName}</h5>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">Category: {doc.category}</span>
+                    </div>
+                    <div className="border-t border-slate-800 mt-2.5 pt-2 flex items-center justify-between text-[10px]">
+                      <span className="text-slate-500 font-mono">Ver v{doc.version}</span>
+                      <span className="text-indigo-400 group-hover:underline font-semibold flex items-center gap-0.5">
+                        Google Drive Preview &rarr;
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Activities and Timelines section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

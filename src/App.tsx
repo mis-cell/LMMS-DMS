@@ -31,7 +31,9 @@ import {
   Eye,
   Send,
   Trash2,
-  CalendarCheck
+  CalendarCheck,
+  FileText,
+  ShieldAlert
 } from "lucide-react";
 
 import { User, Matter, LegalDocument, LegalNotice, Hearing, AuditLog, CompanyType, MatterType, MatterStatus } from "./types";
@@ -103,7 +105,8 @@ export default function App() {
     { id: "TSK-001", company: "Yajur", title: "Review Standing Orders draft details", assignee: "Rahul Verma", priority: "High", dueDate: "2026-06-10", status: "In Progress" },
     { id: "TSK-002", company: "Bally Jute", title: "Audit ESI Contribution list", assignee: "Ananya Sen", priority: "Medium", dueDate: "2026-06-08", status: "To Do" },
     { id: "TSK-003", company: "Yashoda", title: "Submit ex-parte injunction pleadings Calcutta High Court", assignee: "Vikram Rao", priority: "High", dueDate: "2026-06-28", status: "Review" },
-    { id: "TSK-004", company: "Yajur", title: "Verify GST ITC input claims FY23", assignee: "Amit Sharma", priority: "Low", dueDate: "2026-06-20", status: "Done" }
+    { id: "TSK-004", company: "Yajur", title: "Verify GST ITC input claims FY23", assignee: "Amit Sharma", priority: "Low", dueDate: "2026-06-20", status: "Done" },
+    { id: "TSK-005", company: "Yajur", title: "File Emergency Stay Order at Alipore Civil Court", assignee: "Rahul Verma", priority: "High", dueDate: "2026-06-05", status: "In Progress" }
   ]);
 
   const [invoices, setInvoices] = useState<any[]>([
@@ -117,6 +120,11 @@ export default function App() {
     { id: "APP-002", company: "Bally Jute", title: "Union Settlement Mutual Accord", requester: "Sanjay Bose", date: "2026-06-01", priority: "Medium", status: "Pending" },
     { id: "APP-003", company: "Yashoda", title: "Rajarhat Site Mutation Certificate", requester: "Vikram Rao", date: "2026-05-30", priority: "High", status: "Approved" }
   ]);
+
+  // Secure File Previewer & Cron Alert states
+  const [selectedDocForPreview, setSelectedDocForPreview] = useState<LegalDocument | null>(null);
+  const [cronAlerts, setCronAlerts] = useState<any[]>([]);
+  const [silencedAlertIds, setSilencedAlertIds] = useState<Set<string>>(new Set());
 
   // Form Modals State
   const [showNewMatterModal, setShowNewMatterModal] = useState(false);
@@ -210,6 +218,79 @@ export default function App() {
     }
     loadData();
   }, [activeUser, refreshTrigger]);
+
+  // Periodic cron simulation checking for tasks and notices expiring within 3 days.
+  useEffect(() => {
+    const runCronCheck = () => {
+      const today = new Date("2026-06-03");
+      const activeAlerts: any[] = [];
+      const upcomingThreshold = 3 * 24 * 60 * 60 * 1050; // 3 days buffer
+
+      // Check tasks
+      tasks.forEach((tsk) => {
+        if (!tsk.dueDate || tsk.status === "Done") return;
+        const due = new Date(tsk.dueDate);
+        const diff = due.getTime() - today.getTime();
+        if (diff >= 0 && diff <= upcomingThreshold) {
+          activeAlerts.push({
+            id: tsk.id,
+            company: tsk.company,
+            title: tsk.title,
+            type: "Task Deadline Imminent",
+            dueDate: tsk.dueDate,
+            daysLeft: Math.ceil(diff / (24 * 60 * 60 * 1000)),
+            assignee: tsk.assignee
+          });
+        }
+      });
+
+      // Check notices
+      notices.forEach((ntc) => {
+        if (!ntc.deadlineDate || ntc.status === "Responded") return;
+        const due = new Date(ntc.deadlineDate);
+        const diff = due.getTime() - today.getTime();
+        if (diff >= 0 && diff <= upcomingThreshold) {
+          activeAlerts.push({
+            id: ntc.id,
+            company: ntc.company,
+            title: ntc.description || "Inbound Compliance Action required",
+            type: "Notice Filing Imminent",
+            dueDate: ntc.deadlineDate,
+            daysLeft: Math.ceil(diff / (24 * 60 * 60 * 1000)),
+            assignee: ntc.legalTeamLead
+          });
+        }
+      });
+
+      if (activeAlerts.length > 0) {
+        // Trigger visual alerts
+        const unsilencedCount = activeAlerts.filter(act => !silencedAlertIds.has(act.id)).length;
+        if (unsilencedCount > 0) {
+          // Play warning chime sound dynamically in frontend
+          try {
+            const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = context.createOscillator();
+            const gain = context.createGain();
+            osc.connect(gain);
+            gain.connect(context.destination);
+            osc.frequency.setValueAtTime(587.33, context.currentTime); // D5 high tone
+            gain.gain.setValueAtTime(0.04, context.currentTime);
+            osc.start();
+            osc.stop(context.currentTime + 0.15);
+          } catch {}
+          setCronAlerts(activeAlerts);
+        } else {
+          setCronAlerts([]);
+        }
+      } else {
+        setCronAlerts([]);
+      }
+    };
+
+    runCronCheck();
+    const cronInterval = setInterval(runCronCheck, 15000);
+    return () => clearInterval(cronInterval);
+  }, [tasks, notices, silencedAlertIds]);
 
   // Adjust company view isolation if user toggles context
   const handleCompanySwitch = (co: string) => {
@@ -664,6 +745,7 @@ export default function App() {
               effectiveCompany={effectiveCompany}
               onTabChange={setActiveTab}
               theme={theme}
+              onSelectDocument={(doc) => setSelectedDocForPreview(doc)}
             />
           )}
 
@@ -698,7 +780,7 @@ export default function App() {
               approvals={approvalsQueue}
               onApprove={handleApprovalsAction}
               onTriggerSignRemind={(title) => alert(`✉️ Email Reminder Dispatched: Re-requested signatories to sign contract: "${title}"`)}
-              onDocClick={() => setActiveTab("dms")}
+              onDocClick={(doc) => setSelectedDocForPreview(doc)}
               theme={theme}
             />
           )}
@@ -759,6 +841,7 @@ export default function App() {
               activeUser={activeUser}
               effectiveCompany={effectiveCompany}
               matters={matters}
+              invoices={invoices}
             />
           )}
 
@@ -1146,6 +1229,208 @@ export default function App() {
             </form>
 
           </div>
+        </div>
+      )}
+
+      {/* SECURE GOOGLE DRIVE FILE PREVIEWER MODAL */}
+      {selectedDocForPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-4 select-none text-slate-800 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col w-full max-w-5xl h-[85vh] overflow-hidden">
+            
+            {/* Securised GDrive Simulation Header */}
+            <div className="flex justify-between items-center bg-slate-950 text-white px-5 py-3 border-b border-slate-800 font-sans">
+              <div className="flex items-center gap-2.5">
+                <span className="p-1.5 rounded bg-blue-600/20 text-blue-400 font-bold text-xs"><FileText className="w-5 h-5" /></span>
+                <div>
+                  <h3 className="text-xs font-black truncate max-w-md text-slate-100 font-mono" title={selectedDocForPreview.fileName}>
+                    {selectedDocForPreview.fileName}
+                  </h3>
+                  <span className="text-[9.5px] text-emerald-400 font-extrabold flex items-center gap-1 uppercase tracking-wider">
+                    <ShieldCheck className="w-3.5 h-3.5" /> SECURE GOOGLE DRIVE ENCRYPTED VIEW
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex bg-slate-900 px-3 py-1.5 rounded border border-slate-800 text-[10px] items-center gap-2 font-semibold">
+                  <span className="text-slate-500">ZOOM:</span>
+                  <span className="font-mono text-indigo-400">100% (Fit Window)</span>
+                </div>
+                <button 
+                  onClick={() => setSelectedDocForPreview(null)}
+                  className="bg-slate-850 hover:bg-slate-800 text-slate-350 text-slate-400 p-2 rounded-full cursor-pointer transition"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* GDrive Simulation View Grid */}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-950">
+              
+              {/* Left Sandbox View (Manipulated legal copy manuscript) */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center gap-6 relative min-h-0 bg-slate-900 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]">
+                
+                {/* Digitised Watermark Background overlay */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.035] select-none select-none overflow-hidden rotate-12">
+                  <span className="text-[52px] font-black tracking-widest text-[#185FA5] text-center uppercase whitespace-pre">
+                    LRLMS PORTAL - SECURE SANDBOX VIEWING<br />
+                    LRLMS PORTAL - SECURE SANDBOX VIEWING<br />
+                    LRLMS PORTAL - SECURE SANDBOX VIEWING
+                  </span>
+                </div>
+
+                {/* Page 1 */}
+                <div className="bg-white text-slate-850 text-slate-800 w-full max-w-[650px] shadow-lg rounded-md p-8 min-h-[550px] font-serif leading-relaxed text-xs border border-slate-200 relative select-text">
+                  <div className="absolute top-4 right-4 text-[9.5px] font-mono text-slate-300 font-bold uppercase select-none">Page 1 of 2</div>
+                  
+                  {/* Page header */}
+                  <div className="text-center pb-6 border-b border-slate-100 uppercase tracking-widest text-[10px] font-bold text-slate-400 select-none">
+                    LEGAL RECORD MANAGEMENT STORAGE COPRORATE SYSTEM
+                  </div>
+
+                  <div className="mt-8 space-y-4">
+                    <h2 className="text-center font-bold text-slate-950 text-sm mb-4 tracking-tight">MEMORANDUM OF UNDERSTANDING & AGREEMENT PROMPTUS</h2>
+                    
+                    <p className="indent-8">
+                      This formal deed witnesseth that <strong>{selectedDocForPreview.parties?.join(" and ") || selectedDocForPreview.company}</strong> covenants and agrees under strict corporate guidelines relating to safe file storage and legal audits.
+                    </p>
+
+                    <h4 className="font-bold text-slate-900 uppercase tracking-wide text-[10.5px] mt-6">Section I: Purpose & Definitions</h4>
+                    <p className="indent-6">
+                      The purpose of this instrument is to record the understandings, agreements, potential liabilities, and dispute exposure estimates currently evaluated. <strong>Risk Severity analysis of this filing has been automated through calibrated LRLMS filters</strong>.
+                    </p>
+
+                    <h4 className="font-bold text-slate-900 uppercase tracking-wide text-[10.5px] mt-4">Section II: Risk and Vulnerabilities Audit Summary</h4>
+                    <p className="indent-6 bg-slate-50 p-3 rounded border border-slate-100 font-sans text-[11px] text-slate-600 leading-normal">
+                      <strong>AI Extraction OCR Ledger:</strong> {selectedDocForPreview.riskSummary || "Baseline metadata verification complete. No anomalies detected."}
+                    </p>
+
+                    <h4 className="font-bold text-slate-900 uppercase tracking-wide text-[10.5px] mt-4">Section III: Non-Performance covenants</h4>
+                    <p className="indent-6">
+                      If either counterparty fails to provide satisfactory statutory performance in their respective jurisdiction (Yajur, Bally Jute or Yashoda), they will forfeit their standard dockets reserves and suffer priority indexing.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Page 2 */}
+                <div className="bg-white text-slate-850 text-slate-800 w-full max-w-[650px] shadow-lg rounded-md p-8 min-h-[250px] font-serif leading-relaxed text-xs border border-slate-200 relative select-text">
+                  <div className="absolute top-4 right-4 text-[9.5px] font-mono text-slate-300 font-bold uppercase select-none">Page 2 of 2</div>
+                  <div className="space-y-4 mt-8">
+                    <h4 className="font-bold text-slate-900 uppercase tracking-wide text-[10.5px]">Section IV: Execution Signatories</h4>
+                    <p>In witness thereof, the corporate representatives execute this agreement in their true capacities.</p>
+                    
+                    <div className="grid grid-cols-2 gap-8 pt-8 text-[11px] font-sans">
+                      <div>
+                        <div className="border-b border-slate-350 border-slate-300 h-8 font-mono italic text-indigo-650 text-indigo-600">Prosun Majhi [Digitally Verified]</div>
+                        <span className="block mt-1 font-bold text-slate-500 uppercase text-[9px]">Authorized Super Admin</span>
+                        <span className="block text-[9.5px] text-slate-400">Timestamp: 2026-06-03 06:45:56 UTC</span>
+                      </div>
+                      <div>
+                        <div className="border-b border-slate-350 border-slate-300 h-8 font-mono italic text-slate-400">Pending Execution</div>
+                        <span className="block mt-1 font-bold text-slate-500 uppercase text-[9px]">{selectedDocForPreview.uploadedBy}</span>
+                        <span className="block text-[9.5px] text-slate-400">Classification Category: {selectedDocForPreview.category}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Sidebar Details Pane */}
+              <div className="w-full md:w-80 bg-slate-950 p-5 border-t md:border-t-0 md:border-l border-slate-800 overflow-y-auto text-slate-300 space-y-5 font-sans">
+                <span className="block text-[9.5px] font-black uppercase tracking-widest text-[#185FA5]">Filing Audit Metadata</span>
+                
+                <div className="space-y-3.5 text-xs">
+                  <div>
+                    <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Document Title</span>
+                    <strong className="text-white block truncate mt-0.5" title={selectedDocForPreview.fileName}>{selectedDocForPreview.fileName}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9.5px] uppercase font-bold">LRLMS System Unique Hash Code</span>
+                    <code className="text-indigo-300 block font-mono text-[10.5px] bg-slate-900 py-1 px-1.5 rounded truncate mt-1">
+                      SHA256_{selectedDocForPreview.googleDriveFileId || "SANDBOX_MOCK_DRIVE_HASH_ID"}
+                    </code>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Uploaded By</span>
+                      <strong className="text-slate-200 block truncate mt-0.5">{selectedDocForPreview.uploadedBy}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Uploaded Date</span>
+                      <strong className="text-slate-200 block truncate mt-0.5">{new Date(selectedDocForPreview.uploadedOn).toLocaleDateString()}</strong>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Division Clearance</span>
+                      <strong className="text-slate-200 block truncate mt-0.5">{selectedDocForPreview.company}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Document Version</span>
+                      <strong className="text-slate-200 block truncate mt-0.5 font-mono">v{selectedDocForPreview.version}.0</strong>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Security Classification Status</span>
+                    <span className="inline-block mt-1 font-mono text-[9px] font-bold bg-amber-950 text-amber-500 px-2 py-0.5 rounded border border-amber-900/40 uppercase tracking-widest">
+                      RESTRICTED ARCHIVES
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 text-[11px] leading-relaxed">
+                  <span className="block text-[9.5px] font-black uppercase text-rose-400 tracking-wider mb-1.5 flex items-center gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5" /> Google Drive Policy Warning
+                  </span>
+                  Raw downloading and printing acts for this filing have been <strong className="text-slate-100 font-semibold">withheld by your organisation's compliance administrator</strong>. Safe sandbox viewer is active under Multi-Tenant separation rules.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CRON MONITOR SERVICE ALERT ALARM FLOATING STACK */}
+      {cronAlerts.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-45 space-y-3.5 w-96 font-sans max-h-[400px] overflow-y-auto">
+          {cronAlerts.map((alert) => (
+            <div 
+              key={alert.id}
+              className="bg-slate-900 text-white border-l-4 border-rose-500 rounded-lg shadow-2xl p-4 animate-in slide-in-from-bottom-6 duration-300 relative border border-slate-800"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="p-1 rounded bg-rose-500/10 text-rose-500"><Bell className="w-4 h-4 animate-bounce" /></span>
+                  <span className="text-rose-505 text-rose-500 text-[10.5px] uppercase tracking-widest font-black">CRON WARNING SERVICE</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    setSilencedAlertIds(prev => {
+                      const updated = new Set(prev);
+                      updated.add(alert.id);
+                      return updated;
+                    });
+                  }}
+                  className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
+                  title="Close and Silence this alert warning"
+                >
+                  Dismiss &times;
+                </button>
+              </div>
+
+              <div className="mt-3.5 space-y-1.5">
+                <h5 className="text-slate-100 font-bold leading-normal text-xs font-mono">{alert.title}</h5>
+                <p className="text-[10px] text-slate-400 font-medium">Clearance Tenant Context: <strong className="text-[#185FA5] text-indigo-300">{alert.company}</strong></p>
+                
+                <div className="flex items-center justify-between text-[10.5px] text-rose-405 text-rose-400 font-bold bg-rose-950/20 border border-rose-900/30 py-1 px-2 rounded-md mt-2">
+                  <span>EXPIRING IN: {alert.daysLeft} DAYS</span>
+                  <span className="font-mono">Deadline limits: {new Date(alert.dueDate).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

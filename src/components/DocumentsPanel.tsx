@@ -23,7 +23,7 @@ interface DocumentsPanelProps {
   approvals: any[];
   onApprove: (id: string, decision: "Approved" | "Rejected") => void;
   onTriggerSignRemind: (id: string) => void;
-  onDocClick: () => void;
+  onDocClick: (doc: LegalDocument) => void;
   theme: any;
 }
 
@@ -110,7 +110,7 @@ export default function DocumentsPanel({
             {filteredDocs.map(doc => (
               <div 
                 key={doc.id} 
-                onClick={onDocClick}
+                onClick={() => onDocClick(doc)}
                 className="bg-white border border-slate-100 rounded-xl p-4 shadow-3xs hover:border-indigo-400 hover:shadow-xs transition duration-200 cursor-pointer flex flex-col justify-between h-44"
               >
                 <div>
