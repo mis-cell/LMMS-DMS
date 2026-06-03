@@ -543,7 +543,7 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
       const probe = await probeSupabaseConnection();
       if (probe.success) {
         // Fetch all live tables from Supabase and sync local DB state!
-        const [users, matters, docs, notices, hearings, audits] = await Promise.all([
+        let [users, matters, docs, notices, hearings, audits] = await Promise.all([
           directSupabaseRequest("lrlms_users?select=*"),
           directSupabaseRequest("lrlms_matters?select=*"),
           directSupabaseRequest("lrlms_documents?select=*"),
@@ -551,6 +551,32 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
           directSupabaseRequest("lrlms_hearings?select=*"),
           directSupabaseRequest("lrlms_audit_logs?select=*&order=timestamp.desc")
         ]);
+
+        // Auto-seed table structures if they are connected, but completely empty!
+        if (users && users.length === 0) {
+          console.log("Supabase connected but found empty. Bootstrapping data seeds from frontend client...");
+          try {
+            await Promise.all([
+              directSupabaseRequest("lrlms_users", { method: "POST", headers: { "Prefer": "resolution=ignore-duplicates" }, body: JSON.stringify(INITIAL_USERS) }),
+              directSupabaseRequest("lrlms_matters", { method: "POST", headers: { "Prefer": "resolution=ignore-duplicates" }, body: JSON.stringify(INITIAL_MATTERS) }),
+              directSupabaseRequest("lrlms_documents", { method: "POST", headers: { "Prefer": "resolution=ignore-duplicates" }, body: JSON.stringify(INITIAL_DOCUMENTS) }),
+              directSupabaseRequest("lrlms_notices", { method: "POST", headers: { "Prefer": "resolution=ignore-duplicates" }, body: JSON.stringify(INITIAL_NOTICES) }),
+              directSupabaseRequest("lrlms_hearings", { method: "POST", headers: { "Prefer": "resolution=ignore-duplicates" }, body: JSON.stringify(INITIAL_HEARINGS) }),
+              directSupabaseRequest("lrlms_audit_logs", { method: "POST", headers: { "Prefer": "resolution=ignore-duplicates" }, body: JSON.stringify(INITIAL_AUDITS) })
+            ]);
+
+            // Re-assign fetched variables to avoid returning empty arrays on this initial synchronized request as well
+            users = INITIAL_USERS;
+            matters = INITIAL_MATTERS;
+            docs = INITIAL_DOCUMENTS;
+            notices = INITIAL_NOTICES;
+            hearings = INITIAL_HEARINGS;
+            audits = INITIAL_AUDITS;
+            console.log("Supabase table bootstrap finished successfully.");
+          } catch (seedErr) {
+            console.error("Failed to automatically seed Supabase on-the-fly:", seedErr);
+          }
+        }
 
         if (users) db.users = users;
         if (matters) db.matters = matters;

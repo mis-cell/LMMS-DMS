@@ -197,23 +197,63 @@ spec:
           {/* Database setup metrics */}
           <div className="bg-white border rounded-xl p-5 shadow-xs">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">PostgreSQL Database Connection</h4>
-            <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-lg text-emerald-800 flex items-start gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 mt-1.5" />
-              <div>
-                <p className="font-bold text-xs">Active Supabase connection verified</p>
-                <span className="text-[10.5px] text-emerald-700 font-sans block mt-1 leading-normal">
-                  Multi-tenant isolated dockets correctly configured. Cloud sync running perfectly on Cloud Run nodes.
-                </span>
+            
+            {sysStatus?.active ? (
+              <div className="space-y-3">
+                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-lg text-emerald-800 flex items-start gap-2.5 animate-pulse-once">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 mt-1.5" />
+                  <div>
+                    <p className="font-bold text-xs">Supabase Connected & Active</p>
+                    <span className="text-[10.5px] text-emerald-700 font-sans block mt-1 leading-normal">
+                      Excellent, counselor! All tables are active and connected directly to Supabase client REST pipeline.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Table Schema verification log */}
+                <div className="bg-slate-50 border p-3 rounded-lg space-y-1.5 font-mono text-[9px] text-slate-600">
+                  <span className="text-[10px] font-bold text-slate-700 block mb-1">Central Tables Roster (VERIFIED):</span>
+                  {Object.entries(sysStatus?.tables || {}).map(([tableName, exists]) => (
+                    <div key={tableName} className="flex justify-between items-center">
+                      <span>• {tableName}</span>
+                      <span className={exists ? "text-emerald-600 font-bold" : "text-amber-500"}>
+                        {exists ? "✔ ONLINE" : "✖ MISSING"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-lg text-amber-800 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-xs">Tables Missing / Fallback Active</p>
+                    <span className="text-[10.5px] text-amber-700 font-sans block mt-1 leading-normal">
+                      The REST endpoints are reachable, but we couldn't find the requisite schema tables in your Supabase dashboard.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50/50 border border-dashed border-amber-200 p-3 rounded-lg text-[10.5px] text-slate-600 leading-normal">
+                  <p className="font-bold text-amber-800 mb-1">How to Connect & Seed:</p>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>Copy & Execute the context script inside <span className="font-mono bg-amber-100 px-1 rounded">/schema.sql</span> in your Supabase dashboard SQL Editor.</li>
+                    <li>Once tables are created, click the <span className="font-bold text-indigo-600">Trigger Manual DB Seed</span> button below to initialize demo records!</li>
+                  </ol>
+                </div>
+              </div>
+            )}
             
             <div className="mt-4 pt-4 border-t flex justify-between items-center text-[10.5px] font-sans text-slate-400">
-              <span>Server region: SE-Asia (Singapore)</span>
+              <span className="font-mono text-[9px] max-w-[150px] truncate">
+                Host: {sysStatus?.details?.url || "vterzzuvlxkhjowfehye.supabase.co"}
+              </span>
               <button 
                 onClick={onShowDevPanelClick}
                 className="text-indigo-650 text-indigo-600 font-bold hover:underline cursor-pointer"
               >
-                Configure drive folders &rarr;
+                Configure folders &rarr;
               </button>
             </div>
           </div>
