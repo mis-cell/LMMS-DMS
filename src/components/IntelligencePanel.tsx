@@ -317,6 +317,76 @@ export default function IntelligencePanel({
             <span className="text-xs text-slate-400 font-semibold">Immutable system logs mapping: {filteredAudits.length} events</span>
           </div>
 
+          {/* Chronological Mini Timeline View representing company administrative flow */}
+          <div className="bg-white border p-6 rounded-xl shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-indigo-600" />
+                Chronological Administrative Activity Map ({effectiveCompany === "Group" ? "All Divisions" : effectiveCompany + " Division"})
+              </h4>
+              <span className="text-[10px] text-slate-400 font-medium font-sans">Sequence flow (oldest &rarr; newest)</span>
+            </div>
+
+            {(() => {
+              const chronologicalLogs = [...filteredAudits]
+                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                .slice(-5); // Select the latest 5 chronologically ordered events
+
+              if (chronologicalLogs.length === 0) {
+                return (
+                  <div className="text-center py-6 border border-dashed rounded-lg bg-slate-50/40 text-slate-400 text-xs font-sans">
+                    No recorded activities found in the administrative audit vault for {effectiveCompany}.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="relative pt-4 pb-2">
+                  {/* Connect Line */}
+                  <div className="absolute top-[28px] left-8 right-8 h-0.5 bg-slate-100 z-0 hidden md:block" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-6 relative z-10">
+                    {chronologicalLogs.map((log, index) => {
+                      const logDate = new Date(log.timestamp);
+                      const timeStr = logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const dateStr = logDate.toLocaleDateString([], { month: 'short', day: '2-digit' });
+                      
+                      const isLatest = index === chronologicalLogs.length - 1;
+
+                      return (
+                        <div key={log.id || index} className="flex flex-col items-center md:items-start text-center md:text-left bg-slate-50/50 p-3 rounded-xl border border-slate-100/80 hover:border-indigo-200 hover:bg-slate-50 transition duration-150 group">
+                          <div className="flex items-center gap-3 w-full justify-center md:justify-start">
+                            {/* Milestone Marker Node */}
+                            <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold font-mono border-2 transition-all group-hover:scale-105 shadow-3xs ${
+                              isLatest 
+                                ? "bg-indigo-650 border-indigo-600 text-indigo-600 font-extrabold bg-indigo-50" 
+                                : "bg-white border-slate-300 text-slate-500"
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div className="text-left">
+                              <span className="text-[9px] text-slate-400 block font-semibold uppercase">{log.userName}</span>
+                              <span className="text-[9px] text-slate-400 font-mono italic">{dateStr} {timeStr}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-2.5 space-y-1 text-left w-full">
+                            <span className="text-[11px] font-bold text-slate-800 block line-clamp-1 group-hover:text-indigo-600 transition">
+                              {log.action}
+                            </span>
+                            <p className="text-[10px] text-slate-500 leading-snug line-clamp-2 h-7 italic">
+                              "{log.details}"
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="bg-white border rounded-xl overflow-hidden shadow-xs">
             <table className="w-full text-xs font-sans text-slate-705 text-slate-600">
               <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">

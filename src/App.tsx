@@ -406,6 +406,37 @@ export default function App() {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const handleBulkStatusUpdate = async (ids: string[], newStatus: MatterStatus) => {
+    setIsSyncing(true);
+    try {
+      const promises = ids.map(id => {
+        return handleClientSideFallback(`/api/matters/${id}`, {
+          method: "PATCH",
+          headers: { "x-user-id": activeUser?.id || "u-super" },
+          body: JSON.stringify({ status: newStatus })
+        });
+      });
+      await Promise.all(promises);
+      
+      // Create a single consolidated audit log
+      await handleClientSideFallback("/api/audit-logs", {
+        method: "POST",
+        headers: { "x-user-id": activeUser?.id || "u-super" },
+        body: JSON.stringify({
+          action: "Bulk Status Update",
+          company: effectiveCompany,
+          details: `Batch administrative transition of ${ids.length} legal matters to state: "${newStatus}".`
+        })
+      });
+      
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error("Bulk status transition failed: ", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleTaskProgressAction = (id: string, currentStatus: string) => {
     const lanes = ["To Do", "In Progress", "Review", "Done"];
     const nextIdx = (lanes.indexOf(currentStatus) + 1) % lanes.length;
@@ -767,6 +798,7 @@ export default function App() {
               onViewMatterDetail={setViewDetailMatter}
               onInstantiateMatterClick={() => setShowNewMatterModal(true)}
               onLogNoticeClick={() => setShowNoticeModal(true)}
+              onBulkStatusUpdate={handleBulkStatusUpdate}
               theme={theme}
             />
           )}
@@ -781,6 +813,7 @@ export default function App() {
               onApprove={handleApprovalsAction}
               onTriggerSignRemind={(title) => alert(`✉️ Email Reminder Dispatched: Re-requested signatories to sign contract: "${title}"`)}
               onDocClick={(doc) => setSelectedDocForPreview(doc)}
+              onUpload={handleDocUploadCallback}
               theme={theme}
             />
           )}

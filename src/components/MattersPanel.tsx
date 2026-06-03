@@ -22,6 +22,7 @@ interface MattersPanelProps {
   onViewMatterDetail: (matter: Matter) => void;
   onInstantiateMatterClick: () => void;
   onLogNoticeClick: () => void;
+  onBulkStatusUpdate?: (ids: string[], newStatus: MatterStatus) => void;
   theme: any;
 }
 
@@ -34,10 +35,12 @@ export default function MattersPanel({
   onViewMatterDetail,
   onInstantiateMatterClick,
   onLogNoticeClick,
+  onBulkStatusUpdate,
   theme
 }: MattersPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
+  const [selectedMatterIds, setSelectedMatterIds] = useState<Set<string>>(new Set());
 
   // Determine active item type mapping to this tab
   const getTabMatters = () => {
@@ -218,6 +221,49 @@ export default function MattersPanel({
             </select>
           </div>
 
+          {/* Bulk Action Header */}
+          {selectedMatterIds.size > 0 && (
+            <div className="bg-indigo-50 border border-indigo-150 p-4 rounded-xl flex items-center justify-between flex-wrap gap-4 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="flex items-center gap-2">
+                <span className="p-1 px-1.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded">
+                  {selectedMatterIds.size} Selected
+                </span>
+                <span className="text-xs text-slate-700 font-medium font-sans">
+                  Batch administrative status update in progress...
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500 font-bold whitespace-nowrap">Apply Stage:</span>
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    const status = e.target.value as MatterStatus;
+                    if (status && onBulkStatusUpdate) {
+                      onBulkStatusUpdate(Array.from(selectedMatterIds), status);
+                      setSelectedMatterIds(new Set());
+                    }
+                  }}
+                  className="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  <option value="" disabled>-- Select New Status --</option>
+                  <option value="Opened">Opened / Drafted</option>
+                  <option value="Under Review">Under Review</option>
+                  <option value="Filed">Filed dockets</option>
+                  <option value="Hearing">Hearing proceedings</option>
+                  <option value="Closed">Closed</option>
+                </select>
+
+                <button
+                  onClick={() => setSelectedMatterIds(new Set())}
+                  className="px-3 py-1.5 hover:bg-white text-slate-500 border border-slate-150 text-xs font-semibold rounded-lg cursor-pointer transition"
+                >
+                  Deselect all
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Database Grid */}
           <div className="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-xs">
             {filteredList.length === 0 ? (
@@ -230,7 +276,24 @@ export default function MattersPanel({
               <table className="w-full text-xs text-slate-600 font-sans">
                 <thead className="bg-slate-50 border-b select-none font-bold text-slate-400">
                   <tr className="text-left">
-                    <th className="p-3.5 pl-5 uppercase text-[10px] tracking-wider">Matter/ID</th>
+                    <th className="p-3.5 pl-5 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={filteredList.length > 0 && filteredList.every(m => selectedMatterIds.has(m.id))}
+                        onChange={() => {
+                          const allSelected = filteredList.every(m => selectedMatterIds.has(m.id));
+                          const copy = new Set(selectedMatterIds);
+                          if (allSelected) {
+                            filteredList.forEach(m => copy.delete(m.id));
+                          } else {
+                            filteredList.forEach(m => copy.add(m.id));
+                          }
+                          setSelectedMatterIds(copy);
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                      />
+                    </th>
+                    <th className="p-3.5 pl-2 uppercase text-[10px] tracking-wider">Matter/ID</th>
                     <th className="p-3.5 uppercase text-[10px] tracking-wider">Company</th>
                     <th className="p-3.5 uppercase text-[10px] tracking-wider">Jurisdiction / Court</th>
                     <th className="p-3.5 uppercase text-[10px] tracking-wider">Assigned Counsel</th>
@@ -241,7 +304,23 @@ export default function MattersPanel({
                 <tbody className="divide-y divide-slate-100">
                   {filteredList.map(m => (
                     <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 pl-5">
+                      <td className="p-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedMatterIds.has(m.id)}
+                          onChange={() => {
+                            const copy = new Set(selectedMatterIds);
+                            if (copy.has(m.id)) {
+                              copy.delete(m.id);
+                            } else {
+                              copy.add(m.id);
+                            }
+                            setSelectedMatterIds(copy);
+                          }}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                        />
+                      </td>
+                      <td className="p-4 pl-2">
                         <div className="font-semibold text-slate-800 text-[12.5px] leading-snug">{m.title}</div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {m.id} • {m.department}</div>
                       </td>
