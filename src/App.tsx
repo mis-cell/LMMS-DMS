@@ -356,6 +356,37 @@ export default function App() {
     }
   };
 
+  const handleDocEditCallback = async (docId: string, updatedFields: Partial<LegalDocument>) => {
+    setIsSyncing(true);
+    try {
+      await handleClientSideFallback(`/api/documents/${docId}`, {
+        method: "PATCH",
+        headers: { "x-user-id": activeUser?.id || "u-super" },
+        body: JSON.stringify(updatedFields)
+      });
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error("Failed to edit document details: ", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDocDeleteCallback = async (docId: string) => {
+    setIsSyncing(true);
+    try {
+      await handleClientSideFallback(`/api/documents/${docId}`, {
+        method: "DELETE",
+        headers: { "x-user-id": activeUser?.id || "u-super" }
+      });
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error("Failed to delete document: ", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -814,6 +845,8 @@ export default function App() {
               onTriggerSignRemind={(title) => alert(`✉️ Email Reminder Dispatched: Re-requested signatories to sign contract: "${title}"`)}
               onDocClick={(doc) => setSelectedDocForPreview(doc)}
               onUpload={handleDocUploadCallback}
+              onEdit={handleDocEditCallback}
+              onDelete={handleDocDeleteCallback}
               theme={theme}
             />
           )}

@@ -13,9 +13,14 @@ import {
   RefreshCw, 
   ArrowUpRight,
   Upload,
-  Download
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  AlertTriangle,
+  Calendar
 } from "lucide-react";
-import { LegalDocument, Matter } from "../types";
+import { LegalDocument, Matter, DocCategory } from "../types";
 import DocumentUploadModal from "./DocumentUploadModal";
 
 interface DocumentsPanelProps {
@@ -33,6 +38,8 @@ interface DocumentsPanelProps {
     matterId: string | null;
     textContent: string;
   }) => Promise<void>;
+  onEdit?: (docId: string, updatedFields: Partial<LegalDocument>) => Promise<void>;
+  onDelete?: (docId: string) => Promise<void>;
   theme: any;
 }
 
@@ -46,6 +53,8 @@ export default function DocumentsPanel({
   onTriggerSignRemind,
   onDocClick,
   onUpload,
+  onEdit,
+  onDelete,
   theme
 }: DocumentsPanelProps) {
   const [dmsSearch, setDmsSearch] = useState("");
@@ -56,6 +65,43 @@ export default function DocumentsPanel({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
+  // States for Editing details
+  const [editingDoc, setEditingDoc] = useState<LegalDocument | null>(null);
+  const [editFileName, setEditFileName] = useState("");
+  const [editCategory, setEditCategory] = useState<string>("");
+  const [editRiskLevel, setEditRiskLevel] = useState<"Low" | "Medium" | "High">("Low");
+  const [editParties, setEditParties] = useState("");
+  const [editExpiryDate, setEditExpiryDate] = useState("");
+
+  const handleStartEdit = (doc: LegalDocument) => {
+    setEditingDoc(doc);
+    setEditFileName(doc.fileName);
+    setEditCategory(doc.category);
+    setEditRiskLevel(doc.riskLevel || "Low");
+    setEditParties(doc.parties?.join(", ") || "");
+    setEditExpiryDate(doc.expiryDate || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingDoc || !onEdit) return;
+    const partiesArr = editParties.split(",").map(p => p.trim()).filter(Boolean);
+    await onEdit(editingDoc.id, {
+      fileName: editFileName,
+      category: editCategory as any,
+      riskLevel: editRiskLevel,
+      parties: partiesArr,
+      expiryDate: editExpiryDate || null
+    });
+    setEditingDoc(null);
+  };
+
+  const handleDeleteDoc = async (id: string, name: string) => {
+    if (!onDelete) return;
+    if (confirm(`Are you absolutely sure you want to delete compliance document "${name}" from secure archives?`)) {
+      await onDelete(id);
+    }
+  };
+
   // Filter GDrive documents
   const compDocs = documents.filter(d => effectiveCompany === "Group" || d.company === effectiveCompany);
   const filteredDocs = compDocs.filter(d => {
@@ -64,7 +110,7 @@ export default function DocumentsPanel({
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ["All", "Contracts", "Notices", "Audits", "Agreements", "Compliance", "Licenses"];
+  const categories = ["All", "Contracts", "Agreements", "Court Orders", "Pleadings", "Notices", "Licenses", "Internal Opinions"];
 
   const handleToggleSelect = (id: string) => {
     const copy = new Set(selectedDocIds);
@@ -272,40 +318,96 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredDocs.map(doc => (
-              <div 
-                key={doc.id} 
-                onClick={() => onDocClick(doc)}
-                className="bg-white border border-slate-100 rounded-xl p-4 shadow-3xs hover:border-indigo-400 hover:shadow-xs transition duration-200 cursor-pointer flex flex-col justify-between h-44"
-              >
-                <div>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="checkbox"
-                        checked={selectedDocIds.has(doc.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => handleToggleSelect(doc.id)}
-                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
-                      />
-                      <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><FileText className="w-5 h-5" /></span>
-                    </div>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      doc.riskLevel === "High" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"
-                    }`}>
-                      Risk level: {doc.riskLevel || "Low"}
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-800 font-sans mt-3 truncate" title={doc.fileName}>{doc.fileName}</h4>
-                  <span className="text-[10.5px] block text-slate-400 mt-1">Classification: {doc.category}</span>
+            {filteredDocs.length === 0 ? (
+              <div className="col-span-full bg-white border border-slate-100 rounded-2xl p-10 text-center shadow-xs flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+                  <FileText className="w-8 h-8 text-indigo-500" />
                 </div>
-                
-                <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[11px] font-medium text-slate-500">
-                  <span className="font-semibold text-slate-400">Ver: v{doc.version}</span>
-                  <span className="text-indigo-600 hover:underline">Download Link &rarr;</span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">No Documents Found</h3>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    We couldn't find any documents matching the criteria for <strong className="text-slate-700">"{activeCategory}"</strong> category within the <strong className="text-slate-700">{effectiveCompany === "Group" ? "All" : effectiveCompany}</strong> workspace context.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {activeCategory !== "All" && (
+                    <button
+                      onClick={() => setActiveCategory("All")}
+                      className="px-3 py-2 border rounded-lg text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 cursor-pointer transition select-none"
+                    >
+                      Reset Category Filters
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-xs cursor-pointer"
+                  >
+                    Upload Document / New Entry
+                  </button>
                 </div>
               </div>
-            ))}
+            ) : (
+              filteredDocs.map(doc => (
+                <div 
+                  key={doc.id} 
+                  className="bg-white border border-slate-100 rounded-xl p-4 shadow-3xs hover:border-indigo-400 hover:shadow-xs transition duration-200 flex flex-col justify-between h-48 relative"
+                >
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="checkbox"
+                          checked={selectedDocIds.has(doc.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => handleToggleSelect(doc.id)}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><FileText className="w-5 h-5" /></span>
+                      </div>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        doc.riskLevel === "High" ? "bg-rose-50 text-rose-700" : doc.riskLevel === "Medium" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                      }`}>
+                        Risk level: {doc.riskLevel || "Low"}
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-00 text-slate-800 font-sans mt-3 truncate" title={doc.fileName}>{doc.fileName}</h4>
+                    <span className="text-[10.5px] block text-slate-400 mt-1">Classification: {doc.category}</span>
+                    {doc.parties && doc.parties.length > 0 && (
+                      <span className="text-[9.5px] block text-slate-500 mt-1 truncate" title={doc.parties.join(", ")}>Parties: {doc.parties.join(", ")}</span>
+                    )}
+                  </div>
+                  
+                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                    <span className="font-semibold text-slate-400">Ver: v{doc.version}</span>
+                    
+                    {/* Action Hub buttons group to View, Edit, or Delete */}
+                    <div className="flex items-center gap-1 bg-slate-50 border p-1 rounded-lg">
+                      <button
+                        onClick={() => onDocClick(doc)}
+                        className="p-1 text-slate-500 hover:bg-white rounded hover:text-indigo-600 transition cursor-pointer"
+                        title="View safe PDF folder simulation content"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleStartEdit(doc)}
+                        className="p-1 text-slate-500 hover:bg-white rounded hover:text-amber-600 transition cursor-pointer"
+                        title="Edit metadata index records of this document"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDoc(doc.id, doc.fileName)}
+                        className="p-1 text-slate-500 hover:bg-white rounded hover:text-rose-600 transition cursor-pointer"
+                        title="Delete this document record from server database"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -501,6 +603,119 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
                 documents={documents}
                 currentCompany={effectiveCompany === "Group" ? "Yajur" : effectiveCompany}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Document Details Modal */}
+      {editingDoc && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 font-sans select-none text-slate-800 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center bg-slate-50 border-b px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <Edit className="w-4 h-4 text-amber-500" />
+                <h3 className="font-bold text-slate-800 text-sm">Edit Filing Detail Registry</h3>
+              </div>
+              <button
+                onClick={() => setEditingDoc(null)}
+                className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-full cursor-pointer transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-500 uppercase text-[9.5px] mb-1.5">Filing File Name</label>
+                <input
+                  type="text"
+                  value={editFileName}
+                  onChange={e => setEditFileName(e.target.value)}
+                  className="w-full text-xs px-3 py-2 border rounded-lg focus:border-indigo-400 outline-none font-sans"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-500 uppercase text-[9.5px] mb-1.5">Classification Category</label>
+                <select
+                  value={editCategory}
+                  onChange={e => setEditCategory(e.target.value)}
+                  className="w-full text-xs px-3 py-2 border rounded-lg focus:border-indigo-400 outline-none bg-white font-sans"
+                >
+                  <option value="Contracts">Contracts</option>
+                  <option value="Court Orders">Court Orders</option>
+                  <option value="Pleadings">Pleadings</option>
+                  <option value="Notices">Notices</option>
+                  <option value="Agreements">Agreements</option>
+                  <option value="Compliance Documents">Compliance Documents</option>
+                  <option value="Licenses">Licenses</option>
+                  <option value="Certificates">Certificates</option>
+                  <option value="Intellectual Property Records">Intellectual Property Records</option>
+                  <option value="Internal Legal Opinions">Internal Legal Opinions</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-500 uppercase text-[9.5px] mb-1.5">Artificial Intelligence Risk Level</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["Low", "Medium", "High"] as const).map(lvl => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setEditRiskLevel(lvl)}
+                      className={`py-2 text-[11px] font-bold border rounded-lg transition-all cursor-pointer ${
+                        editRiskLevel === lvl
+                          ? "bg-indigo-600 text-white border-indigo-650"
+                          : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      {lvl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-500 uppercase text-[9.5px] mb-1.5">Involved Parties (Comma Separated)</label>
+                <input
+                  type="text"
+                  value={editParties}
+                  onChange={e => setEditParties(e.target.value)}
+                  placeholder="e.g., Yajur Ltd, Bengal Suppliers"
+                  className="w-full text-xs px-3 py-2 border rounded-lg focus:border-indigo-400 outline-none font-sans"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-500 uppercase text-[9.5px] mb-1.5">Expiry Date Checklist (Optional)</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={editExpiryDate}
+                    onChange={e => setEditExpiryDate(e.target.value)}
+                    className="w-full text-xs pl-9 pr-3 py-2 border rounded-lg focus:border-indigo-400 outline-none font-sans"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-5 py-3 border-t flex justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setEditingDoc(null)}
+                className="px-4 py-2 border border-slate-250 border-slate-200 rounded-lg font-semibold hover:bg-slate-100 cursor-pointer transition select-none"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg cursor-pointer transition select-none shadow-xs"
+              >
+                Update Filing
+              </button>
             </div>
           </div>
         </div>

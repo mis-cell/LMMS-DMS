@@ -885,6 +885,53 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
     return new Response(JSON.stringify(newDoc), { status: 200 });
   }
 
+  // 10.1 PATCH /api/documents/:id
+  if (url.startsWith("/api/documents/") && method === "PATCH") {
+    const docId = url.split("/").pop() || "";
+    const docIdx = db.documents.findIndex((d: any) => d.id === docId);
+    if (docIdx === -1) {
+      return new Response(JSON.stringify({ error: "Document not found" }), { status: 404 });
+    }
+    
+    const originalDoc = db.documents[docIdx];
+    const updatedDoc = { ...originalDoc, ...body };
+    db.documents[docIdx] = updatedDoc;
+    clientState.save(db);
+    
+    try {
+      const probe = await probeSupabaseConnection();
+      if (probe.tables.lrlms_documents) {
+        await directSupabaseRequest(`lrlms_documents?id=eq.${docId}`, { method: "PATCH", body: JSON.stringify(body) });
+      }
+    } catch {}
+    
+    await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, originalDoc.company, "Document Edited", `Updated details of compliance document: "${originalDoc.fileName}".`);
+    return new Response(JSON.stringify(updatedDoc), { status: 200 });
+  }
+
+  // 10.2 DELETE /api/documents/:id
+  if (url.startsWith("/api/documents/") && method === "DELETE") {
+    const docId = url.split("/").pop() || "";
+    const docIdx = db.documents.findIndex((d: any) => d.id === docId);
+    if (docIdx === -1) {
+      return new Response(JSON.stringify({ error: "Document not found" }), { status: 404 });
+    }
+    
+    const deletedDoc = db.documents[docIdx];
+    db.documents.splice(docIdx, 1);
+    clientState.save(db);
+    
+    try {
+      const probe = await probeSupabaseConnection();
+      if (probe.tables.lrlms_documents) {
+        await directSupabaseRequest(`lrlms_documents?id=eq.${docId}`, { method: "DELETE" });
+      }
+    } catch {}
+    
+    await addFallbackAuditLog(activeUser.id, activeUser.name, activeUser.role, deletedDoc.company, "Document Deleted", `Removed compliance document: "${deletedDoc.fileName}" from remote repository.`);
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  }
+
   // 11. POST /api/notices
   if (url === "/api/notices" && method === "POST") {
     const { company, type, subType, senderOrRecipient, receivedOrSentDate, deadlineDate, description, legalTeamLead } = body;
