@@ -382,15 +382,15 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
               filteredDocs.map(doc => (
                 <div 
                   key={doc.id} 
-                  className="bg-white border border-slate-100 rounded-xl p-4 shadow-3xs hover:border-indigo-400 hover:shadow-xs transition duration-200 flex flex-col justify-between h-48 relative"
+                  onClick={() => onDocClick(doc)}
+                  className="bg-white border border-slate-100 rounded-xl p-4 shadow-3xs hover:border-indigo-400 hover:shadow-xs transition duration-200 flex flex-col justify-between h-48 relative cursor-pointer group"
                 >
                   <div>
                     <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox"
                           checked={selectedDocIds.has(doc.id)}
-                          onClick={(e) => e.stopPropagation()}
                           onChange={() => handleToggleSelect(doc.id)}
                           className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
                         />
@@ -402,14 +402,14 @@ END OF LEDGER EXPORT REPORT (SHA-256 INTEGRITY VALIDATED)
                         Risk level: {doc.riskLevel || "Low"}
                       </span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-00 text-slate-800 font-sans mt-3 truncate" title={doc.fileName}>{doc.fileName}</h4>
+                    <h4 className="text-xs font-bold text-slate-800 font-sans mt-3 truncate group-hover:text-indigo-600 transition-colors" title={doc.fileName}>{doc.fileName}</h4>
                     <span className="text-[10.5px] block text-slate-400 mt-1">Classification: {doc.category}</span>
                     {doc.parties && doc.parties.length > 0 && (
                       <span className="text-[9.5px] block text-slate-500 mt-1 truncate" title={doc.parties.join(", ")}>Parties: {doc.parties.join(", ")}</span>
                     )}
                   </div>
                   
-                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[11px] font-medium text-slate-500" onClick={(e) => e.stopPropagation()}>
                     <span className="font-semibold text-slate-400">Ver: v{doc.version}</span>
                     
                     {/* Action Hub buttons group to View, Edit, or Delete */}

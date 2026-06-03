@@ -310,26 +310,26 @@ export default function App() {
         }
       });
 
-      if (activeAlerts.length > 0) {
-        // Trigger visual alerts
-        const unsilencedCount = activeAlerts.filter(act => !silencedAlertIds.has(act.id)).length;
-        if (unsilencedCount > 0) {
-          // Play warning chime sound dynamically in frontend
-          try {
-            const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const osc = context.createOscillator();
-            const gain = context.createGain();
-            osc.connect(gain);
-            gain.connect(context.destination);
-            osc.frequency.setValueAtTime(587.33, context.currentTime); // D5 high tone
-            gain.gain.setValueAtTime(0.04, context.currentTime);
-            osc.start();
-            osc.stop(context.currentTime + 0.15);
-          } catch {}
-          setCronAlerts(activeAlerts);
-        } else {
-          setCronAlerts([]);
-        }
+      const unsilencedAlerts = activeAlerts.filter(act => !silencedAlertIds.has(act.id));
+      if (unsilencedAlerts.length > 0) {
+        setCronAlerts(prev => {
+          const hasNew = unsilencedAlerts.some(fa => !prev.some(pa => pa.id === fa.id));
+          if (hasNew) {
+            // Play warning chime sound dynamically in frontend
+            try {
+              const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const osc = context.createOscillator();
+              const gain = context.createGain();
+              osc.connect(gain);
+              gain.connect(context.destination);
+              osc.frequency.setValueAtTime(587.33, context.currentTime); // D5 high tone
+              gain.gain.setValueAtTime(0.04, context.currentTime);
+              osc.start();
+              osc.stop(context.currentTime + 0.15);
+            } catch {}
+          }
+          return unsilencedAlerts;
+        });
       } else {
         setCronAlerts([]);
       }
@@ -578,6 +578,27 @@ export default function App() {
       })
     });
     setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleAlertClick = (alertObj: any) => {
+    // 1. Switch context to the alert's company
+    if (alertObj.company) {
+      setEffectiveCompany(alertObj.company);
+    }
+    
+    // 2. Identify type and navigate
+    if (alertObj.type === "Matter Status Stagnant") {
+      const origId = alertObj.id.replace("STAGNANT-", "");
+      const matched = matters.find(m => m.id === origId);
+      if (matched) {
+        setActiveTab("matters");
+        setViewDetailMatter(matched);
+      }
+    } else if (alertObj.type === "Notice Filing Imminent") {
+      setActiveTab("compliance");
+    } else if (alertObj.type === "Task Deadline Imminent") {
+      setActiveTab("tasks");
+    }
   };
 
   const handleApprovalsAction = async (id: string, decision: "Approved" | "Rejected") => {
@@ -1024,6 +1045,9 @@ export default function App() {
               onTabChange={setActiveTab}
               theme={theme}
               onSelectDocument={(doc) => setSelectedDocForPreview(doc)}
+              onCompanyChange={handleCompanySwitch}
+              onViewMatterDetail={(m) => setViewDetailMatter(m)}
+              invoices={invoices}
             />
           )}
 
@@ -2042,9 +2066,10 @@ export default function App() {
             return (
               <div 
                 key={alert.id}
-                className={`bg-slate-900 text-white border-l-4 ${
+                onClick={() => handleAlertClick(alert)}
+                className={`bg-slate-900 hover:bg-slate-850/90 text-white border-l-4 ${
                   isStagnant ? "border-amber-500" : "border-rose-500"
-                } rounded-lg shadow-2xl p-4 animate-in slide-in-from-bottom-6 duration-300 relative border border-slate-800`}
+                } rounded-lg shadow-2xl p-4 animate-in slide-in-from-bottom-6 duration-300 relative border border-slate-800 transition-colors cursor-pointer group`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-1.5 font-sans">
@@ -2060,14 +2085,15 @@ export default function App() {
                     </span>
                   </div>
                   <button 
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSilencedAlertIds(prev => {
                         const updated = new Set(prev);
                         updated.add(alert.id);
                         return updated;
                       });
                     }}
-                    className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
+                    className="text-slate-400 hover:text-white hover:bg-slate-800 text-xs px-2 py-0.5 rounded cursor-pointer z-50 select-none relative"
                     title="Close and Silence this alert warning"
                   >
                     Dismiss &times;
@@ -2075,7 +2101,7 @@ export default function App() {
                 </div>
 
                 <div className="mt-3 space-y-1.5">
-                  <h5 className="text-slate-100 font-bold leading-normal text-xs font-mono">{alert.title}</h5>
+                  <h5 className="text-slate-100 font-bold leading-normal text-xs font-mono group-hover:text-indigo-300 transition-colors">{alert.title}</h5>
                   <p className="text-[10px] text-slate-400 font-medium">Clearance Tenant Context: <strong className="text-indigo-300">{alert.company}</strong></p>
                   
                   {isStagnant ? (
@@ -2089,6 +2115,12 @@ export default function App() {
                        <span className="font-mono font-normal">Deadline limits: {new Date(alert.dueDate).toLocaleDateString()}</span>
                     </div>
                   )}
+
+                  <div className="pt-2 text-right">
+                    <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider group-hover:underline flex items-center justify-end gap-1 select-none">
+                      Navigate to Resolve &rarr;
+                    </span>
+                  </div>
                 </div>
               </div>
             );

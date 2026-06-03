@@ -337,8 +337,12 @@ export default function MattersPanel({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredList.map(m => (
-                    <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 text-center">
+                    <tr 
+                      key={m.id} 
+                      onClick={() => onViewMatterDetail(m)}
+                      className="hover:bg-indigo-50/20 hover:shadow-2xs transition duration-150 cursor-pointer group"
+                    >
+                      <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedMatterIds.has(m.id)}
@@ -355,7 +359,7 @@ export default function MattersPanel({
                         />
                       </td>
                       <td className="p-4 pl-2">
-                        <div className="font-semibold text-slate-800 text-[12.5px] leading-snug">{m.title}</div>
+                        <div className="font-semibold text-slate-800 text-[12.5px] leading-snug group-hover:text-indigo-600 transition-colors">{m.title}</div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {m.id} • {m.department}</div>
                       </td>
                       <td className="p-4">
@@ -374,8 +378,11 @@ export default function MattersPanel({
                       </td>
                       <td className="p-4 pr-5 text-right">
                         <button
-                          onClick={() => onViewMatterDetail(m)}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-650 text-slate-500 rounded font-bold cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewMatterDetail(m);
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-500 rounded font-bold cursor-pointer transition-all duration-150"
                         >
                           Observe Log
                         </button>

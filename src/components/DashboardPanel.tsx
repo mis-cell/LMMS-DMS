@@ -28,6 +28,9 @@ interface DashboardPanelProps {
   onTabChange: (tab: string) => void;
   theme: any;
   onSelectDocument: (doc: LegalDocument) => void;
+  onCompanyChange?: (cmp: string) => void;
+  onViewMatterDetail?: (matter: Matter) => void;
+  invoices?: any[];
 }
 
 export default function DashboardPanel({
@@ -39,7 +42,10 @@ export default function DashboardPanel({
   effectiveCompany,
   onTabChange,
   theme,
-  onSelectDocument
+  onSelectDocument,
+  onCompanyChange,
+  onViewMatterDetail,
+  invoices
 }: DashboardPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   // Filter core items belonging to selected company
@@ -47,6 +53,7 @@ export default function DashboardPanel({
   const companyDocuments = documents.filter(d => effectiveCompany === "Group" || d.company === effectiveCompany);
   const companyNotices = notices.filter(n => effectiveCompany === "Group" || n.company === effectiveCompany);
   const companyHearings = hearings.filter(h => effectiveCompany === "Group" || h.company === effectiveCompany);
+  const companyInvoices = (invoices || []).filter(i => effectiveCompany === "Group" || i.company === effectiveCompany);
 
   // Computed live metrics
   const activeMattersCount = companyMatters.filter(m => m.status !== "Closed").length;
@@ -92,6 +99,25 @@ export default function DashboardPanel({
     return "bg-indigo-50 text-indigo-600 border border-indigo-100";
   };
 
+  const handleActivityClick = (log: AuditLog) => {
+    const act = log.action.toLowerCase();
+    const details = log.details.toLowerCase();
+    
+    if (act.includes("matter") || details.includes("matter")) {
+      onTabChange("matters");
+    } else if (act.includes("contract") || act.includes("document") || details.includes("contract") || details.includes("document") || details.includes("lease")) {
+      onTabChange("dms");
+    } else if (act.includes("invoice") || details.includes("invoice") || details.includes("disbursement") || details.includes("bill")) {
+      onTabChange("invoices");
+    } else if (act.includes("hearing") || details.includes("hearing") || details.includes("court") || details.includes("trial")) {
+      onTabChange("calendar");
+    } else if (act.includes("notice") || details.includes("notice")) {
+      onTabChange("compliance");
+    } else {
+      onTabChange("matters");
+    }
+  };
+
   // Custom mock exposure calculation in Lakhs (L)
   const totalExposureValue = companyMatters.reduce((sum, m) => sum + m.value, 0);
   const formattedExposureLakhs = totalExposureValue > 0 ? (totalExposureValue / 100000).toFixed(1) + "L" : "24.6L";
@@ -129,7 +155,7 @@ export default function DashboardPanel({
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to inspect active files &rarr;</span>
           </div>
         </div>
 
@@ -148,7 +174,7 @@ export default function DashboardPanel({
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display text-amber-600">{pendingApprovalsCount} Documents</h3>
             <span className="text-[11px] text-amber-600 font-semibold block mt-1">4 core files need signing</span>
-            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to inspect synced approvals &rarr;</span>
           </div>
         </div>
 
@@ -167,7 +193,7 @@ export default function DashboardPanel({
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display text-red-650 text-red-600">{upcomingHearingsCount} Docket trials</h3>
             <span className="text-[11px] text-red-650 text-red-500 font-medium block mt-1">Next trial: 08 Jun 2026</span>
-            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to view tribunal schedules &rarr;</span>
           </div>
         </div>
 
@@ -186,7 +212,7 @@ export default function DashboardPanel({
           <div className="mt-4">
             <h3 className="text-2xl font-bold font-display text-emerald-600">₹{formattedExposureLakhs}</h3>
             <span className="text-[11px] text-slate-400 block mt-1">Isolated Corporate Trial Budget</span>
-            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to show sync files &rarr;</span>
+            <span className="text-[10px] text-indigo-600 block mt-2 font-medium">Click to inspect bills & spendings &rarr;</span>
           </div>
         </div>
       </div>
@@ -199,14 +225,17 @@ export default function DashboardPanel({
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <div>
                 <h4 className="text-xs font-extrabold uppercase tracking-widest text-[#E6F1FB]">
-                  Relevant Synced Documents
+                  {selectedCategory === "Active Matters" ? "Synced Active Matters Listing" : 
+                   selectedCategory === "Pending Approvals" ? "Synced Approval Workflows" :
+                   selectedCategory === "Upcoming Hearings" ? "Upcoming Docket Schedules" :
+                   "Legal Spend & disbursement Ledger"}
                 </h4>
-                <p className="text-[10px] text-slate-400">Live Secure Isolated Partition: <strong className="text-indigo-300 font-mono">{selectedCategory}</strong> ({companyDocuments.length} total repository logs)</p>
+                <p className="text-[10px] text-slate-400">Live Secure Isolated Partition: <strong className="text-indigo-300 font-mono">{selectedCategory}</strong></p>
               </div>
             </div>
             <button 
               onClick={() => setSelectedCategory(null)}
-              className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"
+              className="text-slate-400 hover:text-white text-xs font-semibold px-2.5 py-1 rounded hover:bg-slate-800 cursor-pointer transition"
             >
               Close Ledger View &times;
             </button>
@@ -214,53 +243,168 @@ export default function DashboardPanel({
 
           {/* Filtering */}
           {(() => {
-            let matchedDocs = companyDocuments;
-            if (selectedCategory === "Pending Approvals") {
-              matchedDocs = companyDocuments.filter(d => d.riskLevel === "High" || d.category === "Contracts");
-            } else if (selectedCategory === "Upcoming Hearings") {
-              matchedDocs = companyDocuments.filter(d => d.category.includes("Court") || d.category.includes("Pleadings"));
-            } else if (selectedCategory === "Legal Spend Ledger") {
-              matchedDocs = companyDocuments.filter(d => d.category.includes("Opinions") || d.category.includes("Contracts"));
-            }
-
-            if (matchedDocs.length === 0) {
+            if (selectedCategory === "Active Matters") {
+              const activeMatters = companyMatters.filter(m => m.status !== "Closed");
+              if (activeMatters.length === 0) {
+                return (
+                  <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                    No active matter folders found synced for this corporate context.
+                  </div>
+                );
+              }
               return (
-                <div className="py-6 text-center text-xs text-slate-500 font-mono">
-                  No explicit metadata dockets found synced for selected corporate entity context in this category.
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {activeMatters.map(matter => (
+                    <div 
+                      key={matter.id}
+                      onClick={() => onViewMatterDetail && onViewMatterDetail(matter)}
+                      className="group bg-slate-800 border border-slate-700/60 rounded-lg p-3 hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between hover:bg-slate-700/40"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="p-1.5 rounded bg-slate-700/50 text-indigo-300 group-hover:text-white"><Briefcase className="w-4 h-4" /></span>
+                          <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-indigo-950 text-indigo-400 border border-indigo-900/40">
+                            {matter.type}
+                          </span>
+                        </div>
+                        <h5 className="text-[11.5px] font-bold text-white mt-2 truncate font-mono" title={matter.title}>{matter.title}</h5>
+                        <p className="text-[10px] text-slate-400 mt-1 line-clamp-1 italic">"{matter.description}"</p>
+                      </div>
+                      <div className="border-t border-slate-800 mt-2.5 pt-2 flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500 font-mono">ID: {matter.id}</span>
+                        <span className="text-indigo-400 group-hover:underline font-semibold flex items-center gap-0.5">
+                          View details &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               );
             }
 
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {matchedDocs.map(doc => (
-                  <div 
-                    key={doc.id}
-                    onClick={() => onSelectDocument(doc)}
-                    className="group bg-slate-800 border border-slate-700/60 rounded-lg p-3 hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between hover:bg-slate-700/40"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="p-1.5 rounded bg-slate-700/50 text-indigo-300 group-hover:text-white"><FileText className="w-4 h-4" /></span>
-                        <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                          doc.riskLevel === "High" ? "bg-red-950 text-red-400" : "bg-emerald-950 text-emerald-400"
-                        }`}>
-                          Risk: {doc.riskLevel || "Low"}
+            if (selectedCategory === "Pending Approvals") {
+              const matchedDocs = companyDocuments.filter(d => d.riskLevel === "High" || d.category === "Contracts");
+              if (matchedDocs.length === 0) {
+                return (
+                  <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                    No pending core files require instant signatures.
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {matchedDocs.map(doc => (
+                    <div 
+                      key={doc.id}
+                      onClick={() => onSelectDocument(doc)}
+                      className="group bg-slate-800 border border-slate-700/60 rounded-lg p-3 hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between hover:bg-slate-700/40"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="p-1.5 rounded bg-slate-700/50 text-indigo-300 group-hover:text-white"><FileText className="w-4 h-4" /></span>
+                          <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                            doc.riskLevel === "High" ? "bg-red-950 text-red-450 border border-red-900" : "bg-emerald-950 text-emerald-450 border border-emerald-900"
+                          }`}>
+                            Risk: {doc.riskLevel || "Low"}
+                          </span>
+                        </div>
+                        <h5 className="text-[11.5px] font-bold text-white mt-2 truncate font-mono" title={doc.fileName}>{doc.fileName}</h5>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">Category: {doc.category}</span>
+                      </div>
+                      <div className="border-t border-slate-800 mt-2.5 pt-2 flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500 font-mono">Ver v{doc.version}</span>
+                        <span className="text-indigo-400 group-hover:underline font-semibold flex items-center gap-0.5">
+                          Launch GDrive Sync View &rarr;
                         </span>
                       </div>
-                      <h5 className="text-[11.5px] font-bold text-white mt-2 truncate font-mono" title={doc.fileName}>{doc.fileName}</h5>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">Category: {doc.category}</span>
                     </div>
-                    <div className="border-t border-slate-800 mt-2.5 pt-2 flex items-center justify-between text-[10px]">
-                      <span className="text-slate-500 font-mono">Ver v{doc.version}</span>
-                      <span className="text-indigo-400 group-hover:underline font-semibold flex items-center gap-0.5">
-                        Google Drive Preview &rarr;
-                      </span>
-                    </div>
+                  ))}
+                </div>
+              );
+            }
+
+            if (selectedCategory === "Upcoming Hearings") {
+              const activeHearings = companyHearings.filter(h => h.status === "Scheduled");
+              if (activeHearings.length === 0) {
+                return (
+                  <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                    No scheduled trial schedules or active hearing updates.
                   </div>
-                ))}
-              </div>
-            );
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {activeHearings.map(hearing => (
+                    <div 
+                      key={hearing.id}
+                      onClick={() => onTabChange("calendar")}
+                      className="group bg-slate-800 border border-slate-700/60 rounded-lg p-3 hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between hover:bg-slate-700/40"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="p-1.5 rounded bg-slate-700/50 text-indigo-300 group-hover:text-white"><Gavel className="w-4 h-4" /></span>
+                          <span className="text-[8.5px] font-mono bg-amber-950 text-amber-400 border border-amber-900/60 px-1.5 py-0.5 rounded font-bold uppercase">
+                            Trial Date
+                          </span>
+                        </div>
+                        <h5 className="text-[11.5px] font-bold text-white mt-2 truncate font-mono">{hearing.court}</h5>
+                        <p className="text-[10px] text-slate-300 mt-1">Matter: {hearing.matterTitle}</p>
+                        <span className="text-[10px] text-slate-400 block mt-0.5 italic">Schedule: {hearing.hearingDate}</span>
+                      </div>
+                      <div className="border-t border-slate-800 mt-2.5 pt-2 flex items-center justify-between text-[10px]">
+                        <span className="text-rose-455 text-rose-400 font-bold uppercase tracking-wider">{hearing.status}</span>
+                        <span className="text-indigo-400 group-hover:underline font-semibold flex items-center gap-0.5">
+                          Open Schedule &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
+            if (selectedCategory === "Legal Spend Ledger") {
+              if (companyInvoices.length === 0) {
+                return (
+                  <div className="py-6 text-center text-xs text-slate-500 font-mono">
+                    No client-side billing log disbursements registered.
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {companyInvoices.map(inv => (
+                    <div 
+                      key={inv.id}
+                      onClick={() => onTabChange("invoices")}
+                      className="group bg-slate-800 border border-slate-700/60 rounded-lg p-3 hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between hover:bg-slate-700/40"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="p-1.5 rounded bg-slate-700/50 text-emerald-400 group-hover:text-emerald-300"><DollarSign className="w-4 h-4" /></span>
+                          <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                            inv.status === "Paid" ? "bg-emerald-950 text-emerald-400 border border-emerald-900" : "bg-amber-950 text-amber-400 border border-amber-900"
+                          }`}>
+                            {inv.status}
+                          </span>
+                        </div>
+                        <h5 className="text-[11.5px] font-bold text-white mt-2 truncate font-mono">{inv.firm}</h5>
+                        <p className="text-[10px] text-slate-450 text-slate-400 mt-1">Due Date: {inv.dueDate}</p>
+                        <span className="text-sm font-bold text-emerald-400 block mt-2">₹{inv.amount.toLocaleString()}</span>
+                      </div>
+                      <div className="border-t border-slate-800 mt-2.5 pt-2 flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500 font-mono">{inv.id}</span>
+                        <span className="text-indigo-400 group-hover:underline font-semibold flex items-center gap-0.5">
+                          Pay Invoice Ledger &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
+            return null;
           })()}
         </div>
       )}
@@ -273,13 +417,17 @@ export default function DashboardPanel({
           <div className="space-y-3.5">
             {companyAuditLogs.length > 0 ? (
               companyAuditLogs.map((log) => (
-                <div key={log.id} className="flex items-start gap-3 p-1.5 hover:bg-slate-50 rounded-lg transition">
+                <div 
+                  key={log.id} 
+                  onClick={() => handleActivityClick(log)}
+                  className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group"
+                >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 select-none ${getLogBadgeColors(log.action)}`}>
                     {getInitials(log.userName)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-slate-800 font-medium font-sans">
-                      <strong className="text-slate-900 font-semibold">{log.action}</strong> &mdash; {log.details}
+                      <strong className="text-slate-950 font-bold group-hover:text-indigo-600 transition-colors">{log.action}</strong> &mdash; {log.details}
                     </p>
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1">
                       <span className="font-semibold text-slate-600">{log.userName}</span>
@@ -298,31 +446,31 @@ export default function DashboardPanel({
               ))
             ) : (
               <>
-                <div className="flex items-start gap-3">
+                <div onClick={() => onTabChange("dms")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
                   <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">RS</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">Contract amended &mdash; Bally Jute Supply Agreement</p>
+                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600">Contract amended &mdash; Bally Jute Supply Agreement</p>
                     <span className="text-[10px] text-slate-400 font-sans">Rajan Sharma &bull; Yajur &bull; 2 hours ago</span>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
+                <div onClick={() => onTabChange("matters")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
                   <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0">PM</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">New litigation registered &mdash; Labour Tribunal West Bengal</p>
+                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600">New litigation registered &mdash; Labour Tribunal West Bengal</p>
                     <span className="text-[10px] text-slate-400 font-sans">P. Mukherjee &bull; Yashoda &bull; Yesterday, 3:40 PM</span>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
+                <div onClick={() => onTabChange("matters")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
                   <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">AP</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">Patent renewal reminder logs &mdash; Patent IN 312456</p>
+                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600">Patent renewal reminder logs &mdash; Patent IN 312456</p>
                     <span className="text-[10px] text-slate-400 font-sans">A. Prasad &bull; Yajur &bull; 2 days ago</span>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">SK</div>
+                <div onClick={() => onTabChange("invoices")} className="flex items-start gap-3 p-2 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all cursor-pointer group">
+                  <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0SKSK">SK</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-850 font-medium font-sans text-slate-800">Counsel invoice approved &mdash; ₹1,80,000 disbursement ledger</p>
+                    <p className="text-xs text-slate-800 font-medium font-sans group-hover:text-indigo-600 animate-pulse">Counsel invoice approved &mdash; ₹1,80,000 disbursement ledger</p>
                     <span className="text-[10px] text-slate-400 font-sans">S. Kumar &bull; Bally Jute &bull; 3 days ago</span>
                   </div>
                 </div>
@@ -335,21 +483,33 @@ export default function DashboardPanel({
         <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs">
           <h3 className="text-sm font-bold font-display text-slate-900 mb-4 uppercase tracking-wide text-xs">Upcoming Hearings & Deadlines</h3>
           <div className="space-y-3.5">
-            <div className="border-l-4 border-rose-500 pl-3">
-              <h4 className="text-xs font-bold text-slate-900 leading-snug">Calcutta High Court — Written Objections filing</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">8 Days Remaining · <span className="font-semibold text-rose-600">Urgent</span></span>
+            <div 
+              onClick={() => onTabChange("calendar")}
+              className="border-l-4 border-rose-500 pl-3 cursor-pointer hover:bg-rose-50/40 p-2 rounded transition-all hover:translate-x-1"
+            >
+              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-600 transition-colors">Calcutta High Court — Written Objections filing</h4>
+              <span className="text-[10.5px] text-slate-500 block mt-0.5">8 Days Remaining · <span className="font-semibold text-rose-600 bg-rose-50 px-1 rounded">Urgent</span></span>
             </div>
-            <div className="border-l-4 border-amber-500 pl-3">
-              <h4 className="text-xs font-bold text-slate-900 leading-snug">ESI / PF Monthly Compulsory Audit Challan submission</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">13 Days Remaining · <span className="font-semibold text-amber-600">Pending</span></span>
+            <div 
+              onClick={() => onTabChange("compliance")}
+              className="border-l-4 border-amber-500 pl-3 cursor-pointer hover:bg-amber-50/40 p-2 rounded transition-all hover:translate-x-1"
+            >
+              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-600 transition-colors">ESI / PF Monthly Compulsory Audit Challan submission</h4>
+              <span className="text-[10.5px] text-slate-500 block mt-0.5">13 Days Remaining · <span className="font-semibold text-amber-600 bg-amber-50 px-1 rounded">Pending</span></span>
             </div>
-            <div className="border-l-4 border-indigo-500 pl-3">
-              <h4 className="text-xs font-bold text-slate-900 leading-snug">Warehouse Lease Agreement Renewal Kolkata Node</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">18 Days Remaining · <span className="font-semibold text-indigo-600">General</span></span>
+            <div 
+              onClick={() => onTabChange("property")}
+              className="border-l-4 border-indigo-500 pl-3 cursor-pointer hover:bg-indigo-50/40 p-2 rounded transition-all hover:translate-x-1 font-mono"
+            >
+              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-650 font-sans hover:text-indigo-600 transition-colors">Warehouse Lease Agreement Renewal Kolkata Node</h4>
+              <span className="text-[10.5px] text-slate-500 block mt-0.5">18 Days Remaining · <span className="font-semibold text-indigo-600 bg-indigo-50 px-1 rounded">General</span></span>
             </div>
-            <div className="border-l-4 border-emerald-500 pl-3">
-              <h4 className="text-xs font-bold text-slate-900 leading-snug">Patent Renewal IPO submission — Advanced Sourcing process</h4>
-              <span className="text-[10.5px] text-slate-500 block mt-0.5">30 Days Remaining · <span className="font-semibold text-emerald-600">IP</span></span>
+            <div 
+              onClick={() => onTabChange("ip")}
+              className="border-l-4 border-emerald-500 pl-3 cursor-pointer hover:bg-emerald-50/45 p-2 rounded transition-all hover:translate-x-1"
+            >
+              <h4 className="text-xs font-bold text-slate-900 leading-snug hover:text-indigo-600 transition-colors">Patent Renewal IPO submission — Advanced Sourcing process</h4>
+              <span className="text-[10.5px] text-slate-500 block mt-0.5">30 Days Remaining · <span className="font-semibold text-emerald-600 bg-emerald-50 px-1 rounded">IP Portfolio</span></span>
             </div>
           </div>
         </div>
@@ -361,8 +521,8 @@ export default function DashboardPanel({
         <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs">
           <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Matters by Allocation</h3>
           <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
+            <div onClick={() => onTabChange("contracts")} className="cursor-pointer group hover:bg-slate-50 p-2.5 rounded-lg border border-transparent hover:border-slate-100 transition-all">
+              <div className="flex justify-between text-xs font-semibold mb-1 group-hover:text-indigo-600 transition-colors">
                 <span>Contracts ({countContracts})</span>
                 <span className="text-slate-400">77%</span>
               </div>
@@ -370,17 +530,17 @@ export default function DashboardPanel({
                 <div className="h-full bg-blue-600 rounded-full" style={{ width: "77%" }} />
               </div>
             </div>
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
+            <div onClick={() => onTabChange("litigation")} className="cursor-pointer group hover:bg-slate-50 p-2.5 rounded-lg border border-transparent hover:border-slate-100 transition-all">
+              <div className="flex justify-between text-xs font-semibold mb-1 group-hover:text-indigo-600 transition-colors">
                 <span>Litigation ({countLitigation})</span>
                 <span className="text-slate-400">60%</span>
               </div>
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-red-650 bg-red-600 rounded-full" style={{ width: "60%" }} />
+                <div className="h-full bg-red-600 rounded-full" style={{ width: "60%" }} />
               </div>
             </div>
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
+            <div onClick={() => onTabChange("compliance")} className="cursor-pointer group hover:bg-slate-50 p-2.5 rounded-lg border border-transparent hover:border-slate-100 transition-all">
+              <div className="flex justify-between text-xs font-semibold mb-1 group-hover:text-indigo-600 transition-colors">
                 <span>Compliance ({countCompliance})</span>
                 <span className="text-slate-400">34%</span>
               </div>
@@ -388,13 +548,13 @@ export default function DashboardPanel({
                 <div className="h-full bg-amber-500 rounded-full" style={{ width: "34%" }} />
               </div>
             </div>
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
+            <div onClick={() => onTabChange("ip")} className="cursor-pointer group hover:bg-slate-50 p-2.5 rounded-lg border border-transparent hover:border-slate-100 transition-all font-mono">
+              <div className="flex justify-between text-xs font-semibold mb-1 group-hover:text-indigo-600 transition-colors font-sans">
                 <span>IP / Patents ({countIP})</span>
                 <span className="text-slate-400">17%</span>
               </div>
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-650 bg-purple-650 bg-purple-500 rounded-full" style={{ width: "17%" }} />
+                <div className="h-full bg-purple-500 rounded-full" style={{ width: "17%" }} />
               </div>
             </div>
           </div>
@@ -402,38 +562,49 @@ export default function DashboardPanel({
 
         {/* Company Group Splits */}
         <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs">
-          <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Company Split</h3>
+          <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Company Context</h3>
           <div className="space-y-3.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#185FA5] flex items-center justify-center font-bold text-xs shrink-0 border border-blue-100">Y</div>
+            <div 
+              onClick={() => onCompanyChange && onCompanyChange("Yajur")}
+              className={`flex items-center gap-2.5 cursor-pointer hover:bg-indigo-50/50 p-2.5 rounded-xl border border-transparent hover:border-slate-200 transition ${effectiveCompany === "Yajur" ? 'bg-indigo-55 bg-indigo-50/40 border-indigo-200 shadow-xs' : ''}`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#185FA5] flex items-center justify-center font-bold text-xs shrink-0 border border-blue-100 select-none">Y</div>
               <div className="flex-1">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span>Yajur Industries</span>
-                  <span className="text-slate-500">26 Matters</span>
+                  <span className="hover:text-[#185FA5] font-bold">Yajur Industries</span>
+                  <span className="text-slate-500 font-mono">26 Files</span>
                 </div>
                 <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                   <div className="h-full bg-[#185FA5] rounded-full" style={{ width: "55%" }} />
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-[#854F0B] flex items-center justify-center font-bold text-xs shrink-0 border border-amber-100">B</div>
+
+            <div 
+              onClick={() => onCompanyChange && onCompanyChange("Bally Jute")}
+              className={`flex items-center gap-2.5 cursor-pointer hover:bg-amber-50/50 p-2.5 rounded-xl border border-transparent hover:border-slate-200 transition-all ${effectiveCompany === "Bally Jute" ? 'bg-amber-50/40 border-amber-200 shadow-xs' : ''}`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-[#854F0B] flex items-center justify-center font-bold text-xs shrink-0 border border-amber-100 select-none">B</div>
               <div className="flex-1">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span>Bally Jute Co.</span>
-                  <span className="text-slate-500">17 Matters</span>
+                  <span className="hover:text-[#854F0B] font-bold">Bally Jute Co.</span>
+                  <span className="text-slate-500 font-mono font-normal">17 Files</span>
                 </div>
                 <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                   <div className="h-full bg-[#854F0B] rounded-full" style={{ width: "36%" }} />
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#3B6D11] flex items-center justify-center font-bold text-xs shrink-0 border border-emerald-100">Y</div>
+
+            <div 
+              onClick={() => onCompanyChange && onCompanyChange("Yashoda")}
+              className={`flex items-center gap-2.5 cursor-pointer hover:bg-emerald-50/50 p-2.5 rounded-xl border border-transparent hover:border-slate-200 transition-all ${effectiveCompany === "Yashoda" ? 'bg-emerald-50/40 border-emerald-200 shadow-xs' : ''}`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#3B6D11] flex items-center justify-center font-bold text-xs shrink-0 border border-emerald-100 select-none">Y</div>
               <div className="flex-1">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span>Yashoda Enterprise</span>
-                  <span className="text-slate-500">10 Matters</span>
+                  <span className="hover:text-[#3B6D11] font-bold">Yashoda Enterprise</span>
+                  <span className="text-slate-500 font-mono font-normal">10 Files</span>
                 </div>
                 <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                   <div className="h-full bg-[#3B6D11] rounded-full" style={{ width: "21%" }} />
@@ -446,23 +617,35 @@ export default function DashboardPanel({
         {/* Quick Documents statistics */}
         <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-xs flex flex-col justify-between">
           <div>
-            <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">DMS Repository</h3>
+            <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3 font-display">GDrive DMS Vault</h3>
             <div className="font-sans text-xs space-y-2">
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-400 font-medium">Synced Documents</span>
+              <div 
+                onClick={() => onTabChange("dms")}
+                className="flex justify-between py-2 border-b border-slate-100/60 hover:bg-indigo-50/30 px-2 rounded-lg transition cursor-pointer group"
+              >
+                <span className="text-slate-550 font-semibold group-hover:text-indigo-600 text-slate-500">Synced Documents</span>
                 <span className="font-bold text-slate-800">1,284 entries</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-400 font-medium">Pending Approval</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700">12 Files</span>
+              <div 
+                onClick={() => onTabChange("approvals")}
+                className="flex justify-between py-2 border-b border-slate-100/60 hover:bg-indigo-50/30 px-2 rounded-lg transition cursor-pointer group"
+              >
+                <span className="text-slate-550 font-semibold group-hover:text-indigo-600 text-slate-500">Pending Approval</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700">12 Files</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-400 font-medium">Archived Files</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">342 Files</span>
+              <div 
+                onClick={() => onTabChange("archive")}
+                className="flex justify-between py-2 border-b border-slate-100/60 hover:bg-indigo-50/30 px-2 rounded-lg transition cursor-pointer group"
+              >
+                <span className="text-slate-550 font-semibold group-hover:text-indigo-600 text-slate-500">Archived Files</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">342 Files</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400 font-medium">GDrive Sync Link</span>
-                <span className="text-indigo-600 font-bold">Secure Active</span>
+              <div 
+                onClick={() => onTabChange("dms")}
+                className="flex justify-between py-2 hover:bg-indigo-50/30 px-2 rounded-lg transition cursor-pointer group"
+              >
+                <span className="text-slate-550 font-semibold group-hover:text-indigo-600 text-slate-500">GDrive Sync Link</span>
+                <span className="text-indigo-600 font-bold">Secure Active &rarr;</span>
               </div>
             </div>
           </div>
