@@ -750,8 +750,8 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
     return new Response(JSON.stringify(newMatter), { status: 200 });
   }
 
-  // 8. PATCH /api/matters/:id
-  if (url.startsWith("/api/matters/") && method === "PATCH") {
+  // 8. PATCH / PUT /api/matters/:id
+  if (url.startsWith("/api/matters/") && (method === "PATCH" || method === "PUT")) {
     const id = url.split("/").pop();
     const matterIndex = db.matters.findIndex((m: any) => m.id === id);
     if (matterIndex !== -1) {

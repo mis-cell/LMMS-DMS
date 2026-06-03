@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Download,
   Scale,
+  ExternalLink,
   Bell,
   Calendar,
   Shield,
@@ -138,6 +139,27 @@ export default function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [viewDetailMatter, setViewDetailMatter] = useState<Matter | null>(null);
+  const [isEditingMatter, setIsEditingMatter] = useState(false);
+  const [editMatterForm, setEditMatterForm] = useState<any>(null);
+
+  useEffect(() => {
+    if (viewDetailMatter) {
+      setEditMatterForm({
+        title: viewDetailMatter.title,
+        description: viewDetailMatter.description,
+        opponentParty: viewDetailMatter.opponentParty,
+        externalCounsel: viewDetailMatter.externalCounsel,
+        courtOrAuthority: viewDetailMatter.courtOrAuthority,
+        filingDate: viewDetailMatter.filingDate,
+        status: viewDetailMatter.status,
+        value: viewDetailMatter.value
+      });
+      setIsEditingMatter(false);
+    } else {
+      setEditMatterForm(null);
+      setIsEditingMatter(false);
+    }
+  }, [viewDetailMatter]);
 
   const [newTaskForm, setNewTaskForm] = useState({
     title: "",
@@ -382,6 +404,53 @@ export default function App() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleUpdateMatterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!viewDetailMatter || !editMatterForm) return;
+    setIsSyncing(true);
+    try {
+      const res = await handleClientSideFallback(`/api/matters/${viewDetailMatter.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": activeUser?.id || "u-super"
+        },
+        body: JSON.stringify(editMatterForm)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        // Update local matters state in App.tsx
+        setMatters(prev => prev.map(m => m.id === updated.id ? updated : m));
+        setViewDetailMatter(updated);
+        setIsEditingMatter(false);
+      } else {
+        const errData = await res.json();
+        alert(`Error updating matter: ${errData.error || "Unknown error"}`);
+      }
+    } catch (err: any) {
+      alert(`Network error saving update: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const redirectToMattersTab = () => {
+    if (!viewDetailMatter) return;
+    const targetId = viewDetailMatter.id;
+    setActiveTab("matters");
+    setViewDetailMatter(null);
+    setTimeout(() => {
+      const element = document.getElementById(`matter-card-${targetId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.classList.add("ring-4", "ring-indigo-600", "ring-offset-2");
+        setTimeout(() => {
+          element.classList.remove("ring-4", "ring-indigo-600", "ring-offset-2");
+        }, 3000);
+      }
+    }, 150);
   };
 
   // Sync virtual documents
@@ -1281,52 +1350,217 @@ export default function App() {
 
       {/* MATTERS VIEW LOG PORTFOLIO DETAILS MODAL */}
       {viewDetailMatter && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/60 backdrop-blur-3xs p-4 select-none">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/60 backdrop-blur-3xs p-4 select-text">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-3xl border border-slate-100 overflow-hidden text-xs">
             
             {/* Header */}
             <div className="p-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between">
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-indigo-305 font-mono">Case File Registry detail</span>
+                <span className="text-[10px] uppercase tracking-wider text-indigo-300 font-mono">
+                  {isEditingMatter ? "EDIT MODE: Modify Case Records" : "Case File Registry detail"}
+                </span>
                 <h3 className="text-sm font-bold mt-1 text-white truncate">{viewDetailMatter.title}</h3>
               </div>
               <button 
-                onClick={() => setViewDetailMatter(null)}
+                onClick={() => {
+                  setViewDetailMatter(null);
+                  setIsEditingMatter(false);
+                }}
                 className="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-full cursor-pointer"
               >
                 <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
-            {/* Details list */}
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto text-slate-600 font-sans">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 block uppercase font-mono">Matter ID Code</span>
-                  <strong className="text-slate-800 font-bold block mt-1">{viewDetailMatter.id}</strong>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 block uppercase font-mono">Assigned Division</span>
-                  <strong className="text-slate-800 font-bold block mt-1">{viewDetailMatter.company} Industries</strong>
-                </div>
-              </div>
+            {isEditingMatter && editMatterForm ? (
+              <form onSubmit={handleUpdateMatterSubmit}>
+                {/* Details edit list */}
+                <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto text-slate-600 font-sans">
+                  
+                  <div>
+                    <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Matter Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={editMatterForm.title}
+                      onChange={(e) => setEditMatterForm({ ...editMatterForm, title: e.target.value })}
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white"
+                    />
+                  </div>
 
-              <div className="space-y-2 border-b border-slate-100/60 pb-3">
-                <span className="text-[10px] text-slate-400 block uppercase font-mono">Dispute Particulars Description</span>
-                <p className="text-slate-650 leading-relaxed text-[11.5px] italic">
-                  "{viewDetailMatter.description}"
-                </p>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Matter ID Code</label>
+                      <div className="bg-slate-100 p-2 py-1.5 rounded-lg border border-slate-200 font-mono text-slate-500 text-[10.5px]">
+                        {viewDetailMatter.id}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Assigned Division</label>
+                      <div className="bg-slate-100 p-2 py-1.5 rounded-lg border border-slate-200 text-slate-500 font-semibold text-[10.5px]">
+                        {viewDetailMatter.company} Industries
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="space-y-2 font-sans text-[11.5px] leading-relaxed">
-                <div>Opposing Counsel: <strong className="text-slate-800 font-semibold">{viewDetailMatter.opponentParty}</strong></div>
-                <div>Legal Advocate Assigned: <strong className="text-slate-800 font-semibold">{viewDetailMatter.externalCounsel}</strong></div>
-                <div>Appealed Jurisdiction: <strong className="text-slate-805 text-slate-800 font-semibold">{viewDetailMatter.courtOrAuthority}</strong></div>
-                <div>Logged date: <strong className="text-slate-800 font-semibold">{viewDetailMatter.filingDate}</strong></div>
-                <div>Current Stage: <span className="px-2.5 py-0.5 rounded font-bold bg-amber-50 text-amber-700">{viewDetailMatter.status}</span></div>
-                <div>Legal Spend / Exposure value: <strong className="text-indigo-600 font-bold">₹{viewDetailMatter.value.toLocaleString()} INR</strong></div>
-              </div>
-            </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Dispute Particulars Description</label>
+                    <textarea
+                      required
+                      rows={3}
+                      value={editMatterForm.description}
+                      onChange={(e) => setEditMatterForm({ ...editMatterForm, description: e.target.value })}
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Opposing Counsel</label>
+                      <input
+                        type="text"
+                        required
+                        value={editMatterForm.opponentParty}
+                        onChange={(e) => setEditMatterForm({ ...editMatterForm, opponentParty: e.target.value })}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Legal Advocate Assigned</label>
+                      <input
+                        type="text"
+                        required
+                        value={editMatterForm.externalCounsel}
+                        onChange={(e) => setEditMatterForm({ ...editMatterForm, externalCounsel: e.target.value })}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Appealed Jurisdiction</label>
+                      <input
+                        type="text"
+                        required
+                        value={editMatterForm.courtOrAuthority}
+                        onChange={(e) => setEditMatterForm({ ...editMatterForm, courtOrAuthority: e.target.value })}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Logged Date</label>
+                      <input
+                        type="date"
+                        required
+                        value={editMatterForm.filingDate}
+                        onChange={(e) => setEditMatterForm({ ...editMatterForm, filingDate: e.target.value })}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Current Stage</label>
+                      <select
+                        value={editMatterForm.status}
+                        onChange={(e) => setEditMatterForm({ ...editMatterForm, status: e.target.value as MatterStatus })}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white"
+                      >
+                        {["Opened", "Under Review", "Filed", "Hearing", "Settlement", "Closed"].map((stg) => (
+                          <option key={stg} value={stg}>{stg}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Exposure Value (INR)</label>
+                      <input
+                        type="number"
+                        required
+                        value={editMatterForm.value}
+                        onChange={(e) => setEditMatterForm({ ...editMatterForm, value: Number(e.target.value) })}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMatter(false)}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-650 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isSyncing && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                    Save Updates
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {/* Read Only Details list */}
+                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto text-slate-600 font-sans">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 block uppercase font-mono">Matter ID Code</span>
+                      <strong className="text-slate-800 font-bold block mt-1">{viewDetailMatter.id}</strong>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 block uppercase font-mono">Assigned Division</span>
+                      <strong className="text-slate-800 font-bold block mt-1">{viewDetailMatter.company} Industries</strong>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-b border-slate-100/60 pb-3">
+                    <span className="text-[10px] text-slate-400 block uppercase font-mono">Dispute Particulars Description</span>
+                    <p className="text-slate-650 leading-relaxed text-[11.5px] italic">
+                      "{viewDetailMatter.description}"
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 font-sans text-[11.5px] leading-relaxed">
+                    <div>Opposing Counsel: <strong className="text-slate-800 font-semibold">{viewDetailMatter.opponentParty}</strong></div>
+                    <div>Legal Advocate Assigned: <strong className="text-slate-800 font-semibold">{viewDetailMatter.externalCounsel}</strong></div>
+                    <div>Appealed Jurisdiction: <strong className="text-slate-805 text-slate-800 font-semibold">{viewDetailMatter.courtOrAuthority}</strong></div>
+                    <div>Logged date: <strong className="text-slate-800 font-semibold">{viewDetailMatter.filingDate}</strong></div>
+                    <div>Current Stage: <span className="px-2.5 py-0.5 rounded font-bold bg-amber-50 text-amber-700">{viewDetailMatter.status}</span></div>
+                    <div>Legal Spend / Exposure value: <strong className="text-indigo-600 font-bold">₹{viewDetailMatter.value.toLocaleString()} INR</strong></div>
+                  </div>
+                </div>
+
+                {/* Footer action bar with redirect options */}
+                <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                  {activeUser && (activeUser.role === "Super Admin" || activeUser.company === "Group" || activeUser.company === viewDetailMatter.company) ? (
+                    <button
+                      onClick={() => setIsEditingMatter(true)}
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition cursor-pointer text-center"
+                    >
+                      ✏️ Edit Case details
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 max-w-[200px] leading-snug">
+                      🔒 View-Only: Corporate partition locks editing to authorized company advisors.
+                    </span>
+                  )}
+                  
+                  <button
+                    onClick={redirectToMattersTab}
+                    className="py-2.5 px-3 bg-white border hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition cursor-pointer text-center flex items-center justify-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0 text-slate-450" />
+                    Go to Litigation Board
+                  </button>
+                </div>
+              </>
+            )}
 
           </div>
         </div>
