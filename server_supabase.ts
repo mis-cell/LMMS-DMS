@@ -378,10 +378,10 @@ export async function saveSupabaseAuditLog(log: AuditLog): Promise<boolean> {
 
 // Generate schema generation script for user copy-paste inside the frontend dashboard
 export function getSupabaseSQLScript(): string {
-  return `-- ==========================================
--- LRLMS DATABASE SCHEMAS (SUPABASE POSTGRESQL)
--- Copy and execute inside your Supabase SQL Editor
--- ==========================================
+  return `-- ======================================================
+-- LRLMS DATABASE SCHEMAS (SUPABASE POSTGRESQL MULTI-TENANT)
+-- Copy and execute inside your Supabase Dashboard SQL Editor
+-- ======================================================
 
 -- 1. Create Users Table
 CREATE TABLE IF NOT EXISTS lrlms_users (
@@ -427,7 +427,11 @@ CREATE TABLE IF NOT EXISTS lrlms_documents (
   "riskSummary" TEXT,
   "riskLevel" TEXT,
   "parties" TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
-  "expiryDate" TEXT
+  "expiryDate" TEXT,
+  "isWatermarked" BOOLEAN DEFAULT false,
+  "esignStatus" TEXT DEFAULT 'Draft',
+  "esignCompletedOn" TEXT,
+  "retentionPolicyYrs" INTEGER DEFAULT 7
 );
 
 -- 4. Create Notices Table
@@ -493,7 +497,32 @@ CREATE TABLE IF NOT EXISTS lrlms_clauses (
   "jurisdiction" TEXT NOT NULL
 );
 
--- Ensure correct permissions
+-- 9. Create LDAP/Keycloak Configuration Table (SSO Settings)
+CREATE TABLE IF NOT EXISTS lrlms_sso_config (
+  "id" TEXT PRIMARY KEY,
+  "provider" TEXT NOT NULL, -- 'Keycloak' or 'LDAP/AD'
+  "serverUrl" TEXT NOT NULL,
+  "realmOrDomain" TEXT NOT NULL,
+  "clientId" TEXT,
+  "clientSecret" TEXT,
+  "mfaRequired" BOOLEAN DEFAULT false,
+  "status" TEXT NOT NULL DEFAULT 'Disabled'
+);
+
+-- 10. Create Document Access Logs Table (Security Records)
+CREATE TABLE IF NOT EXISTS lrlms_document_access_logs (
+  "id" TEXT PRIMARY KEY,
+  "documentId" TEXT NOT NULL,
+  "fileName" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "userName" TEXT NOT NULL,
+  "company" TEXT NOT NULL,
+  "action" TEXT NOT NULL, -- 'Read Document', 'Edit Metadata', 'Download Document', 'E-Signed'
+  "ipAddress" TEXT NOT NULL,
+  "timestamp" TEXT NOT NULL
+);
+
+-- Ensure correct Row Level Security (RLS) permissions
 ALTER TABLE lrlms_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_matters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_documents ENABLE ROW LEVEL SECURITY;
@@ -502,8 +531,10 @@ ALTER TABLE lrlms_hearings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lrlms_clauses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lrlms_sso_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lrlms_document_access_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow anonymous public access profiles
+-- Allow anonymous public access policies
 CREATE POLICY "Allow public select" ON lrlms_users FOR SELECT USING (true);
 CREATE POLICY "Allow public insert" ON lrlms_users FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update" ON lrlms_users FOR UPDATE USING (true);
@@ -535,5 +566,13 @@ CREATE POLICY "Allow public update invoices" ON lrlms_invoices FOR UPDATE USING 
 CREATE POLICY "Allow public select clauses" ON lrlms_clauses FOR SELECT USING (true);
 CREATE POLICY "Allow public insert clauses" ON lrlms_clauses FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update clauses" ON lrlms_clauses FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public select sso" ON lrlms_sso_config FOR SELECT USING (true);
+CREATE POLICY "Allow public insert sso" ON lrlms_sso_config FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update sso" ON lrlms_sso_config FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public select doc_access" ON lrlms_document_access_logs FOR SELECT USING (true);
+CREATE POLICY "Allow public insert doc_access" ON lrlms_document_access_logs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update doc_access" ON lrlms_document_access_logs FOR UPDATE USING (true);
 `;
 }

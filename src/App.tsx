@@ -580,6 +580,62 @@ export default function App() {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  // Interactive Document Management Actions: Watermark, E-Sign, and Retention policies
+  const handleDocWatermarkToggleAction = async (docId: string, enabled: boolean) => {
+    setDocuments(prev => prev.map(doc => doc.id === docId ? { ...doc, isWatermarked: enabled } : doc));
+    if (selectedDocForPreview && selectedDocForPreview.id === docId) {
+      setSelectedDocForPreview(prev => prev ? { ...prev, isWatermarked: enabled } : null);
+    }
+    // Create audit log
+    await handleClientSideFallback("/api/audit-logs", {
+      method: "POST",
+      headers: { "x-user-id": activeUser?.id },
+      body: JSON.stringify({
+        action: "Metadata Watermark",
+        company: effectiveCompany,
+        details: `${enabled ? "Enabled" : "Disabled"} secure regulatory watermark on file "${selectedDocForPreview?.fileName || docId}".`
+      })
+    });
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleDocEsignAction = async (docId: string, signerInitials: string) => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    setDocuments(prev => prev.map(doc => doc.id === docId ? { ...doc, esignStatus: "Signed", esignCompletedOn: todayStr } : doc));
+    if (selectedDocForPreview && selectedDocForPreview.id === docId) {
+      setSelectedDocForPreview(prev => prev ? { ...prev, esignStatus: "Signed", esignCompletedOn: todayStr } : null);
+    }
+    // Create audit log
+    await handleClientSideFallback("/api/audit-logs", {
+      method: "POST",
+      headers: { "x-user-id": activeUser?.id },
+      body: JSON.stringify({
+        action: "Digital Sign Affixed",
+        company: effectiveCompany,
+        details: `Affixed authenticated digital signature "${signerInitials}" on compliance file "${selectedDocForPreview?.fileName || docId}".`
+      })
+    });
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleDocRetentionPolicyAction = async (docId: string, years: number) => {
+    setDocuments(prev => prev.map(doc => doc.id === docId ? { ...doc, retentionPolicyYrs: years } : doc));
+    if (selectedDocForPreview && selectedDocForPreview.id === docId) {
+      setSelectedDocForPreview(prev => prev ? { ...prev, retentionPolicyYrs: years } : null);
+    }
+    // Create audit log
+    await handleClientSideFallback("/api/audit-logs", {
+      method: "POST",
+      headers: { "x-user-id": activeUser?.id },
+      body: JSON.stringify({
+        action: "Audit Policy Update",
+        company: effectiveCompany,
+        details: `Updated archive retention duration to ${years} years on file "${selectedDocForPreview?.fileName || docId}".`
+      })
+    });
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   const handleAlertClick = (alertObj: any) => {
     // 1. Switch context to the alert's company
     if (alertObj.company) {
@@ -2004,45 +2060,133 @@ export default function App() {
               </div>
 
               {/* Right Sidebar Details Pane */}
-              <div className="w-full md:w-80 bg-slate-950 p-5 border-t md:border-t-0 md:border-l border-slate-800 overflow-y-auto text-slate-300 space-y-5 font-sans">
-                <span className="block text-[9.5px] font-black uppercase tracking-widest text-[#185FA5]">Filing Audit Metadata</span>
+              <div className="w-full md:w-80 bg-slate-950 p-5 border-t md:border-t-0 md:border-l border-slate-800 overflow-y-auto text-slate-300 space-y-4 font-sans">
+                <span className="block text-[9.5px] font-black uppercase tracking-widest text-[#185FA5] border-b border-slate-900 pb-1.5">Filing Audit Metadata</span>
                 
-                <div className="space-y-3.5 text-xs">
+                <div className="space-y-3 text-xs">
                   <div>
-                    <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Document Title</span>
-                    <strong className="text-white block truncate mt-0.5" title={selectedDocForPreview.fileName}>{selectedDocForPreview.fileName}</strong>
+                    <span className="text-slate-500 block text-[9px] uppercase font-bold">Document Title</span>
+                    <strong className="text-white block truncate mt-0.5 text-[11px]" title={selectedDocForPreview.fileName}>{selectedDocForPreview.fileName}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[9.5px] uppercase font-bold">LRLMS System Unique Hash Code</span>
-                    <code className="text-indigo-300 block font-mono text-[10.5px] bg-slate-900 py-1 px-1.5 rounded truncate mt-1">
+                    <span className="text-slate-500 block text-[9px] uppercase font-bold">LRLMS Cryptographic Hash</span>
+                    <code className="text-indigo-300 block font-mono text-[9.5px] bg-slate-900 py-1 px-1.5 rounded truncate mt-1">
                       SHA256_{selectedDocForPreview.googleDriveFileId || "SANDBOX_MOCK_DRIVE_HASH_ID"}
                     </code>
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div>
-                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Uploaded By</span>
+                      <span className="text-slate-500 block text-[9px] uppercase font-bold">Uploaded By</span>
                       <strong className="text-slate-200 block truncate mt-0.5">{selectedDocForPreview.uploadedBy}</strong>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Uploaded Date</span>
+                      <span className="text-slate-500 block text-[9px] uppercase font-bold">Uploaded Date</span>
                       <strong className="text-slate-200 block truncate mt-0.5">{new Date(selectedDocForPreview.uploadedOn).toLocaleDateString()}</strong>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Division Clearance</span>
+                      <span className="text-slate-500 block text-[9px] uppercase font-bold">Division Clearance</span>
                       <strong className="text-slate-200 block truncate mt-0.5">{selectedDocForPreview.company}</strong>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Document Version</span>
-                      <strong className="text-slate-200 block truncate mt-0.5 font-mono">v{selectedDocForPreview.version}.0</strong>
+                      <span className="text-slate-500 block text-[9px] uppercase font-bold">Document Version</span>
+                      <strong className="text-slate-200 block truncate mt-0.5 font-mono text-[10.5px]">v{selectedDocForPreview.version}.0</strong>
                     </div>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[9.5px] uppercase font-bold">Security Classification Status</span>
-                    <span className="inline-block mt-1 font-mono text-[9px] font-bold bg-amber-950 text-amber-500 px-2 py-0.5 rounded border border-amber-900/40 uppercase tracking-widest">
+                    <span className="text-slate-500 block text-[9px] uppercase font-bold">Security Clearance Class</span>
+                    <span className="inline-block mt-1 font-mono text-[9px] font-bold bg-amber-950 text-amber-500 px-2 py-0.5 rounded border border-amber-900/40 uppercase tracking-widest leading-none">
                       RESTRICTED ARCHIVES
                     </span>
+                  </div>
+                </div>
+
+                {/* Interactive Watermarking Toggle */}
+                <div className="border-t border-slate-900 pt-3">
+                  <span className="text-slate-500 block text-[9px] uppercase font-bold mb-1.5">Document Watermarking</span>
+                  <label className="flex items-center gap-2.5 cursor-pointer bg-slate-900 border border-slate-900/60 p-2.5 rounded-lg hover:bg-slate-850 transition">
+                    <input 
+                      type="checkbox" 
+                      checked={!!selectedDocForPreview.isWatermarked} 
+                      onChange={(e) => handleDocWatermarkToggleAction(selectedDocForPreview.id, e.target.checked)}
+                      className="accent-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-slate-200 text-[10.5px] font-bold block">Apply Security Seal</span>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">Toggle dynamic overlay watermark on raw file pages</span>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Digital Signature Executer */}
+                <div className="border-t border-slate-900 pt-3">
+                  <span className="text-slate-500 block text-[9px] uppercase font-bold mb-1.5">Digital E-Signature</span>
+                  {selectedDocForPreview.esignStatus === "Signed" ? (
+                    <div className="bg-emerald-950/40 border border-emerald-900 text-emerald-400 p-2.5 rounded-lg text-[10px] font-sans">
+                      <span className="font-semibold flex items-center gap-1 mb-0.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Contract fully executed</span>
+                      <span className="text-[9px] text-slate-350 block leading-tight">Electronically timestamped on {selectedDocForPreview.esignCompletedOn} under direct cryptographic seal.</span>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-950/40 border border-amber-900 text-amber-400 p-2.5 rounded-lg text-[10px] space-y-2">
+                      <span className="font-semibold block text-[10.5px] text-amber-500">Awaiting Signatures</span>
+                      <span className="text-[9px] text-slate-350 block leading-tight">Verify identity & sign as Super Admin/Acting rep.</span>
+                      <button 
+                        type="button"
+                        onClick={() => handleDocEsignAction(selectedDocForPreview.id, activeUser?.name || "Legal Officer")}
+                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded text-[9.5px] uppercase tracking-wide cursor-pointer select-none transition"
+                      >
+                        Affix Verified Signature
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Retention Policies */}
+                <div className="border-t border-slate-900 pt-3">
+                  <span className="text-slate-500 block text-[9px] uppercase font-bold mb-1.5">Statutory Retention Policy</span>
+                  <div className="bg-slate-900 border border-slate-900/50 p-2.5 rounded-lg space-y-1.5">
+                    <select 
+                      value={selectedDocForPreview.retentionPolicyYrs || 7}
+                      onChange={(e) => handleDocRetentionPolicyAction(selectedDocForPreview.id, parseInt(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-800 outline-none text-[10px] p-1.5 rounded text-slate-200 cursor-pointer"
+                    >
+                      <option value={7}>7 Years (Standard PF & Tax Laws)</option>
+                      <option value={10}>10 Years (Corporate Liability Limit)</option>
+                      <option value={99}>Indefinite Archiving (Permanent)</option>
+                    </select>
+                    <div className="text-[9px] text-slate-400 leading-snug">
+                      {selectedDocForPreview.retentionPolicyYrs === 99 ? 
+                        "Permanent legal filing. Excluded from automated quarterly system cleanup cycles." : 
+                        `Scheduled for regulatory deletion on year ${2026 + (selectedDocForPreview.retentionPolicyYrs || 7)}.`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Document Access Logs Tracker */}
+                <div className="border-t border-slate-900 pt-3">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-slate-500 text-[9px] uppercase font-bold">Document Access Trail</span>
+                    <span className="text-[8px] font-mono text-slate-500">Live Secure Tracking</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {[
+                      { act: "Read Document", usr: activeUser?.name || "Viewer", time: "Just Now", ip: "192.168.1.14" },
+                      selectedDocForPreview.isWatermarked ? { act: "Anti-Leak Seal Applied", usr: activeUser?.name || "Admin", time: "Moments Ago", ip: "192.168.1.14" } : null,
+                      selectedDocForPreview.esignStatus === "Signed" ? { act: "E-Signed Verified", usr: activeUser?.name || "Admin", time: "Seconds Ago", ip: "192.168.1.14" } : null,
+                      { act: "Initial GDrive Proxy", usr: "Vite Daemon Node", time: "Boot Config", ip: "Cloud-Node-C" }
+                    ].filter(Boolean).slice(0, 3).map((log, idx) => (
+                      <div key={idx} className="bg-slate-900 border border-slate-900/65 px-2 py-1.5 rounded text-[9px] leading-tight flex justify-between select-none">
+                        <div>
+                          <strong className="text-slate-200 block text-[9.5px]">{log!.act}</strong>
+                          <span className="text-slate-400 text-[8.5px] mt-0.5 block">By: {log!.usr}</span>
+                        </div>
+                        <div className="text-right flex flex-col justify-between items-end">
+                          <span className="text-indigo-400 text-[8.5px] font-mono">{log!.time}</span>
+                          <span className="text-slate-500 italic font-mono text-[8px] mt-0.5">{log!.ip}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 

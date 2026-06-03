@@ -18,7 +18,9 @@ export type MatterType =
   | "Regulatory" 
   | "Compliance" 
   | "IP/Trademark" 
-  | "Property";
+  | "Property"
+  | "Arbitration"
+  | "Legal Opinion";
 
 export type MatterStatus = "Opened" | "Under Review" | "Filed" | "Hearing" | "Settlement" | "Closed";
 
@@ -39,6 +41,8 @@ export interface Matter {
   createdOn: string;
   createdBy: string;
   lastUpdatedOn?: string; // Track status updates for stagnancy
+  escalationTier?: "L1 - Counsel" | "L2 - Legal Head" | "L3 - Board Executive"; // Escalation Matrix
+  slaDeadline?: string;
 }
 
 export type DocCategory = 
@@ -78,6 +82,10 @@ export interface LegalDocument {
   expiryDate: string | null; // For contracts
   textContent?: string; // Optional full transcript or legal text content
   versions?: DocumentVersion[]; // DMS traceability version history list
+  isWatermarked?: boolean; // Secure DM requirement
+  esignStatus?: "Draft" | "Sent for Signature" | "Signed"; // Digital Signature requirement
+  esignCompletedOn?: string;
+  retentionPolicyYrs?: number; // Retention Policies requirement
 }
 
 export type NoticeType = "Incoming" | "Outgoing";
@@ -119,6 +127,29 @@ export interface AuditLog {
   details: string;
 }
 
+export interface SSOConfig {
+  id: string;
+  provider: "Keycloak" | "LDAP/AD";
+  serverUrl: string;
+  realmOrDomain: string;
+  clientId?: string;
+  clientSecret?: string;
+  mfaRequired: boolean;
+  status: "Enabled" | "Disabled";
+}
+
+export interface DocumentAccessLog {
+  id: string;
+  documentId: string;
+  fileName: string;
+  userId: string;
+  userName: string;
+  company: CompanyType;
+  action: "Read Document" | "Edit Metadata" | "Download Document" | "E-Signed" | "Watermarking Applied";
+  ipAddress: string;
+  timestamp: string;
+}
+
 export interface DatabaseState {
   users: User[];
   matters: Matter[];
@@ -126,4 +157,6 @@ export interface DatabaseState {
   notices: LegalNotice[];
   hearings: Hearing[];
   auditLogs: AuditLog[];
+  ssoConfigs?: SSOConfig[];
+  documentAccessLogs?: DocumentAccessLog[];
 }
