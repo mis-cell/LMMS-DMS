@@ -395,7 +395,7 @@ app.post("/api/matters", async (req: Request, res: Response) => {
 });
 
 // Update Matter / Transition Stages
-app.put("/api/matters/:id", async (req: Request, res: Response) => {
+const handleUpdateMatter = async (req: Request, res: Response) => {
   const user = getUserContext(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
 
@@ -452,7 +452,10 @@ app.put("/api/matters/:id", async (req: Request, res: Response) => {
   await addAuditLog(user.id, user.name, user.role, matter.company, auditAction, auditDetails);
 
   res.json(matter);
-});
+};
+
+app.put("/api/matters/:id", handleUpdateMatter);
+app.patch("/api/matters/:id", handleUpdateMatter);
 
 // Upload Document with Virtual Google Drive Link and AI-assisted extraction
 app.post("/api/documents", async (req: Request, res: Response) => {
@@ -799,7 +802,7 @@ app.post("/api/notices", async (req: Request, res: Response) => {
 });
 
 // Update Notice Status
-app.put("/api/notices/:id", async (req: Request, res: Response) => {
+const handleUpdateNotice = async (req: Request, res: Response) => {
   const user = getUserContext(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
 
@@ -830,7 +833,10 @@ app.put("/api/notices/:id", async (req: Request, res: Response) => {
   }
 
   res.json(notice);
-});
+};
+
+app.put("/api/notices/:id", handleUpdateNotice);
+app.patch("/api/notices/:id", handleUpdateNotice);
 
 // Create Hearing
 app.post("/api/hearings", async (req: Request, res: Response) => {

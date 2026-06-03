@@ -433,6 +433,7 @@ export default function App() {
         setMatters(prev => prev.map(m => m.id === updated.id ? updated : m));
         setViewDetailMatter(updated);
         setIsEditingMatter(false);
+        setRefreshTrigger(prev => prev + 1);
       } else {
         const errData = await res.json();
         alert(`Error updating matter: ${errData.error || "Unknown error"}`);

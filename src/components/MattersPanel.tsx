@@ -337,9 +337,10 @@ export default function MattersPanel({
                     </th>
                     <th className="p-3.5 pl-2 uppercase text-[10px] tracking-wider">Matter/ID</th>
                     <th className="p-3.5 uppercase text-[10px] tracking-wider">Company</th>
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider">Stage Status</th>
                     <th className="p-3.5 uppercase text-[10px] tracking-wider">Jurisdiction / Court</th>
                     <th className="p-3.5 uppercase text-[10px] tracking-wider">Assigned Counsel</th>
-                    <th className="p-3.5 uppercase text-[10px] tracking-wider text-right">Exposure Exposure Value</th>
+                    <th className="p-3.5 uppercase text-[10px] tracking-wider text-right">Exposure Value</th>
                     <th className="p-3.5 uppercase text-[10px] tracking-wider pr-5 text-right">Details</th>
                   </tr>
                 </thead>
@@ -375,6 +376,23 @@ export default function MattersPanel({
                           m.company === "Yajur" ? "bg-blue-50 text-blue-700" : m.company === "Bally Jute" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"
                         }`}>
                           {m.company}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                          m.status === "Closed" 
+                            ? "bg-slate-100 text-slate-705 text-slate-650 text-slate-605 text-slate-500 border-slate-200" 
+                            : m.status === "Settlement"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                            : m.status === "Hearing"
+                            ? "bg-orange-50 text-orange-750 text-orange-700 border-orange-100"
+                            : m.status === "Filed"
+                            ? "bg-purple-50 text-purple-700 border-purple-100"
+                            : m.status === "Under Review"
+                            ? "bg-amber-50 text-amber-700 border-amber-100"
+                            : "bg-blue-50 text-blue-700 border-blue-100"
+                        }`}>
+                          {m.status}
                         </span>
                       </td>
                       <td className="p-4 text-slate-700 font-medium">
