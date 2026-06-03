@@ -767,7 +767,6 @@ export async function handleClientSideFallback(url: string, options: any = {}): 
         auditAction = "Legal Stage Transition";
         auditDetails = `Matter ${id} transitioned status from '${original.status}' to '${updates.status}'.`;
         updatedMatter.lastUpdatedOn = new Date().toISOString().split("T")[0];
-        updates.lastUpdatedOn = updatedMatter.lastUpdatedOn;
       }
 
       db.matters[matterIndex] = updatedMatter;
